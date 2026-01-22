@@ -19,28 +19,32 @@ export async function POST(request: Request) {
       messages: [
         {
           role: 'user',
-          content: `You are a recruitment content anonymizer. Your job is to rewrite job descriptions and requirements to completely anonymize them so that:
+          content: `You are a professional job description rewriter. Your task is to COMPLETELY REWRITE the following job description and requirements from scratch. 
 
-1. Remove ALL company names, brand names, product names, and any identifying information
-2. Replace specific company references with generic terms like "the company", "our client", "the organization"
-3. Remove any unique internal project names, proprietary technology names, or trademarked terms
-4. Rewrite sentences that could identify the company through context clues (e.g., "leading social media company" instead of specific names)
-5. Keep the job requirements and responsibilities accurate but anonymized
-6. Maintain professional tone and formatting
-7. Preserve any HTML formatting tags (<p>, <ul>, <li>, <strong>, etc.)
+CRITICAL REQUIREMENTS:
+1. REWRITE EVERY SINGLE SENTENCE using completely different words and sentence structures
+2. DO NOT copy any phrases, sentences, or unique wording from the original
+3. Remove ALL company names, brand names, product names, project names, and any identifying information
+4. Use only generic terms like "the company", "our client", "the organization", "the team"
+5. Convey the same job responsibilities and requirements but with entirely new wording
+6. Change the order of bullet points and sections
+7. Use different verbs, adjectives, and phrasing throughout
+8. The rewritten version should be impossible to match back to the original through text comparison
+9. Maintain professional tone and proper HTML formatting (<p>, <ul>, <li>, <strong>, etc.)
+10. Keep the same level of detail but express it completely differently
 
-Here is the content to anonymize:
+Think of this as translating the job posting into "different English" - same meaning, completely different words.
 
-DESCRIPTION:
+ORIGINAL DESCRIPTION:
 ${description || 'N/A'}
 
-REQUIREMENTS:
+ORIGINAL REQUIREMENTS:
 ${requirements || 'N/A'}
 
 Return your response as JSON only with this structure:
 {
-  "description": "anonymized description with HTML formatting preserved",
-  "requirements": "anonymized requirements with HTML formatting preserved"
+  "description": "completely rewritten description with HTML formatting",
+  "requirements": "completely rewritten requirements with HTML formatting"
 }
 
 Return ONLY valid JSON, no markdown code blocks or explanations.`
