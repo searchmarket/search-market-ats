@@ -291,6 +291,12 @@ export default function JobsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    // Validate salary range is provided
+    if (!formData.salary_min || !formData.salary_max) {
+      alert('Salary range (min and max) is required for all jobs')
+      return
+    }
+
     const jobData = {
       title: formData.title,
       client_id: formData.client_id || null,
@@ -301,8 +307,8 @@ export default function JobsPage() {
       country: formData.country,
       location_type: formData.location_type,
       employment_type: formData.employment_type,
-      salary_min: formData.salary_min ? parseFloat(formData.salary_min) : null,
-      salary_max: formData.salary_max ? parseFloat(formData.salary_max) : null,
+      salary_min: parseFloat(formData.salary_min),
+      salary_max: parseFloat(formData.salary_max),
       salary_currency: formData.salary_currency,
       fee_percent: formData.fee_percent ? parseFloat(formData.fee_percent) : null,
       status: formData.status
@@ -365,6 +371,12 @@ export default function JobsPage() {
 
   async function togglePublish(job: Job) {
     const newPublishState = !job.is_published
+
+    // Don't allow publishing without salary range
+    if (newPublishState && (!job.salary_min || !job.salary_max)) {
+      alert('Cannot publish job without salary range. Please add salary min and max first.')
+      return
+    }
 
     const { error } = await supabase
       .from('jobs')
@@ -809,9 +821,10 @@ export default function JobsPage() {
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary Min</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary Min <span className="text-red-500">*</span></label>
                     <input
                       type="number"
+                      required
                       value={formData.salary_min}
                       onChange={(e) => setFormData({ ...formData, salary_min: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
@@ -819,9 +832,10 @@ export default function JobsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary Max</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary Max <span className="text-red-500">*</span></label>
                     <input
                       type="number"
+                      required
                       value={formData.salary_max}
                       onChange={(e) => setFormData({ ...formData, salary_max: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
@@ -1190,9 +1204,10 @@ export default function JobsPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Min</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Min <span className="text-red-500">*</span></label>
                   <input
                     type="number"
+                    required
                     value={formData.salary_min}
                     onChange={(e) => setFormData({ ...formData, salary_min: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
@@ -1200,9 +1215,10 @@ export default function JobsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Max</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Max <span className="text-red-500">*</span></label>
                   <input
                     type="number"
+                    required
                     value={formData.salary_max}
                     onChange={(e) => setFormData({ ...formData, salary_max: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
