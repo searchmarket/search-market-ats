@@ -375,7 +375,7 @@ export default function ClientsPage() {
                   {jobs.map((job) => (
                     <Link 
                       key={job.id} 
-                      href={`/dashboard/jobs?id=${job.id}`}
+                      href={`/dashboard/jobs?id=${job.id}&fromClient=${selectedClient.id}`}
                       className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                       <div className="font-medium text-gray-900 hover:text-brand-accent">{job.title}</div>

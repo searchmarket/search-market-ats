@@ -475,14 +475,24 @@ export default function JobsPage() {
 
   // Detail View
   if (showDetailView && selectedJob) {
+    const fromClientId = searchParams.get('fromClient')
+    
     return (
       <div className="p-8">
         <button
-          onClick={() => { setShowDetailView(false); setSelectedJob(null); router.push('/dashboard/jobs', { scroll: false }) }}
+          onClick={() => { 
+            setShowDetailView(false)
+            setSelectedJob(null)
+            if (fromClientId) {
+              router.push(`/dashboard/clients?id=${fromClientId}`)
+            } else {
+              router.push('/dashboard/jobs', { scroll: false })
+            }
+          }}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Jobs
+          {fromClientId ? 'Back to Client' : 'Back to Jobs'}
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
