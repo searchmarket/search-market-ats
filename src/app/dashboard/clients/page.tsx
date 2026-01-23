@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces, industries } from '@/lib/location-data'
 import { 
@@ -356,12 +357,16 @@ export default function ClientsPage() {
               ) : (
                 <div className="space-y-3">
                   {jobs.map((job) => (
-                    <div key={job.id} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="font-medium text-gray-900">{job.title}</div>
+                    <Link 
+                      key={job.id} 
+                      href={`/dashboard/jobs?id=${job.id}`}
+                      className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="font-medium text-gray-900 hover:text-brand-accent">{job.title}</div>
                       <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${jobStatusColors[job.status]}`}>
                         {job.status.replace('_', ' ')}
                       </span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

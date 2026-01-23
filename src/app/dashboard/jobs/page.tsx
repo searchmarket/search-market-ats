@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces } from '@/lib/location-data'
 import RichTextEditor from '@/components/RichTextEditor'
@@ -70,6 +71,7 @@ export default function JobsPage() {
   const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
+  const searchParams = useSearchParams()
 
   const [formData, setFormData] = useState({
     title: '',
@@ -89,6 +91,18 @@ export default function JobsPage() {
   })
 
   const availableProvinces = provinces[formData.country] || []
+
+  // Handle deep linking from query params
+  useEffect(() => {
+    const jobId = searchParams.get('id')
+    if (jobId && jobs.length > 0) {
+      const job = jobs.find(j => j.id === jobId)
+      if (job) {
+        setSelectedJob(job)
+        setShowDetailView(true)
+      }
+    }
+  }, [searchParams, jobs])
 
   useEffect(() => {
     fetchJobs()
