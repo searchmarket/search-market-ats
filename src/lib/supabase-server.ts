@@ -14,14 +14,28 @@ export function createClient() {
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set({ 
+              name, 
+              value, 
+              ...options,
+              domain: '.search.market',
+              sameSite: 'lax',
+              path: '/'
+            })
           } catch (error) {
             // Handle cookies in Server Components
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value: '', ...options })
+            cookieStore.set({ 
+              name, 
+              value: '', 
+              ...options,
+              domain: '.search.market',
+              maxAge: 0,
+              path: '/'
+            })
           } catch (error) {
             // Handle cookies in Server Components
           }

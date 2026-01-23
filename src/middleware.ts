@@ -31,6 +31,9 @@ export async function middleware(request: NextRequest) {
             name,
             value,
             ...options,
+            domain: '.search.market',
+            sameSite: 'lax',
+            path: '/'
           })
         },
         remove(name: string, options: CookieOptions) {
@@ -48,6 +51,9 @@ export async function middleware(request: NextRequest) {
             name,
             value: '',
             ...options,
+            domain: '.search.market',
+            maxAge: 0,
+            path: '/'
           })
         },
       },
