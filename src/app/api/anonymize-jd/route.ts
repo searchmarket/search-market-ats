@@ -19,10 +19,12 @@ export async function POST(request: Request) {
       messages: [
         {
           role: 'user',
-          content: `You are a professional job description rewriter. Your task is to COMPLETELY REWRITE both the job description AND requirements from scratch.
+          content: `You are a professional job description rewriter. Your task is to COMPLETELY REWRITE both the job description AND the requirements from scratch.
 
-CRITICAL REQUIREMENTS:
-1. REWRITE EVERY SINGLE SENTENCE in BOTH description AND requirements using completely different words and sentence structures
+CRITICAL: YOU MUST REWRITE BOTH SECTIONS. Do not skip or leave either section unchanged.
+
+REWRITING RULES:
+1. REWRITE EVERY SINGLE SENTENCE in BOTH the description AND requirements using completely different words and sentence structures
 2. DO NOT copy any phrases, sentences, or unique wording from the original
 3. Remove ALL company names, brand names, product names, project names, and any identifying information
 4. Use only generic terms like "the company", "our client", "the organization", "the team"
@@ -38,19 +40,19 @@ FORMATTING RULES - VERY IMPORTANT:
 - NEVER use hyphens (-) to connect compound words. Instead of "well-known" write "well known". Instead of "fast-paced" write "fast paced". Instead of "self-motivated" write "self motivated". Rewrite to avoid hyphenated words entirely when possible.
 - Use commas, periods, and colons instead of dashes for punctuation
 
-Think of this as translating the job posting into "different English" - same meaning, completely different words.
+ORIGINAL DESCRIPTION TO REWRITE:
+${description || '(No description provided - skip this section)'}
 
-ORIGINAL DESCRIPTION:
-${description || 'N/A'}
-
-ORIGINAL REQUIREMENTS:
-${requirements || 'N/A'}
+ORIGINAL REQUIREMENTS TO REWRITE:
+${requirements || '(No requirements provided - skip this section)'}
 
 Return your response as JSON only with this structure:
 {
   "description": "completely rewritten description with HTML formatting, no dashes",
   "requirements": "completely rewritten requirements with HTML formatting, no dashes"
 }
+
+IMPORTANT: Both "description" and "requirements" fields MUST contain the fully rewritten content. Do not return empty strings or "N/A".
 
 Return ONLY valid JSON, no markdown code blocks or explanations.`
         }
@@ -65,7 +67,7 @@ Return ONLY valid JSON, no markdown code blocks or explanations.`
       const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       result = JSON.parse(cleanJson)
       
-      // Extra safety: remove any em dashes and replace hyphenated compound words
+      // Extra safety: remove any em dashes and en dashes
       if (result.description) {
         result.description = result.description.replace(/—/g, ', ').replace(/–/g, ', ')
       }

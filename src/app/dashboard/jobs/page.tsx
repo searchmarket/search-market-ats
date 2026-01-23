@@ -246,8 +246,8 @@ export default function JobsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          description: formData.description,
-          requirements: formData.requirements
+          description: formData.description || '',
+          requirements: formData.requirements || ''
         })
       })
 
@@ -259,8 +259,8 @@ export default function JobsPage() {
       const data = await response.json()
       setFormData(prev => ({
         ...prev,
-        description: data.description || prev.description,
-        requirements: data.requirements || prev.requirements
+        description: data.description && data.description !== 'N/A' ? data.description : prev.description,
+        requirements: data.requirements && data.requirements !== 'N/A' ? data.requirements : prev.requirements
       }))
     } catch (error) {
       console.error('Error anonymizing JD:', error)
