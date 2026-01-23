@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces } from '@/lib/location-data'
 import RichTextEditor from '@/components/RichTextEditor'
@@ -72,6 +72,7 @@ export default function JobsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
     title: '',
@@ -385,6 +386,7 @@ export default function JobsPage() {
     setSelectedJob(job)
     setShowDetailView(true)
     setMenuOpen(null)
+    router.push(`/dashboard/jobs?id=${job.id}`, { scroll: false })
   }
 
   function openEditModal(job: Job) {
@@ -476,7 +478,7 @@ export default function JobsPage() {
     return (
       <div className="p-8">
         <button
-          onClick={() => { setShowDetailView(false); setSelectedJob(null) }}
+          onClick={() => { setShowDetailView(false); setSelectedJob(null); router.push('/dashboard/jobs', { scroll: false }) }}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces, industries } from '@/lib/location-data'
 import { 
@@ -42,6 +43,8 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
     company_name: '',
@@ -58,6 +61,18 @@ export default function ClientsPage() {
   })
 
   const availableProvinces = provinces[formData.country] || []
+
+  // Handle deep linking from query params
+  useEffect(() => {
+    const clientId = searchParams.get('id')
+    if (clientId && clients.length > 0) {
+      const client = clients.find(c => c.id === clientId)
+      if (client) {
+        setSelectedClient(client)
+        setShowDetailView(true)
+      }
+    }
+  }, [searchParams, clients])
 
   useEffect(() => {
     fetchClients()
@@ -182,6 +197,7 @@ export default function ClientsPage() {
     setSelectedClient(client)
     setShowDetailView(true)
     setMenuOpen(null)
+    router.push(`/dashboard/clients?id=${client.id}`, { scroll: false })
   }
 
   function openEditModal(client: Client) {
@@ -250,7 +266,7 @@ export default function ClientsPage() {
     return (
       <div className="p-8">
         <button
-          onClick={() => { setShowDetailView(false); setSelectedClient(null) }}
+          onClick={() => { setShowDetailView(false); setSelectedClient(null); router.push('/dashboard/clients', { scroll: false }) }}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
