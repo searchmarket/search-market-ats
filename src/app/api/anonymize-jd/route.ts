@@ -19,10 +19,10 @@ export async function POST(request: Request) {
       messages: [
         {
           role: 'user',
-          content: `You are a professional job description rewriter. Your task is to COMPLETELY REWRITE the following job description and requirements from scratch. 
+          content: `You are a professional job description rewriter. Your task is to COMPLETELY REWRITE both the job description AND requirements from scratch.
 
 CRITICAL REQUIREMENTS:
-1. REWRITE EVERY SINGLE SENTENCE using completely different words and sentence structures
+1. REWRITE EVERY SINGLE SENTENCE in BOTH description AND requirements using completely different words and sentence structures
 2. DO NOT copy any phrases, sentences, or unique wording from the original
 3. Remove ALL company names, brand names, product names, project names, and any identifying information
 4. Use only generic terms like "the company", "our client", "the organization", "the team"
@@ -32,6 +32,11 @@ CRITICAL REQUIREMENTS:
 8. The rewritten version should be impossible to match back to the original through text comparison
 9. Maintain professional tone and proper HTML formatting (<p>, <ul>, <li>, <strong>, etc.)
 10. Keep the same level of detail but express it completely differently
+
+FORMATTING RULES - VERY IMPORTANT:
+- NEVER use the em dash character (—) anywhere in your response
+- NEVER use hyphens (-) to connect compound words. Instead of "well-known" write "well known". Instead of "fast-paced" write "fast paced". Instead of "self-motivated" write "self motivated". Rewrite to avoid hyphenated words entirely when possible.
+- Use commas, periods, and colons instead of dashes for punctuation
 
 Think of this as translating the job posting into "different English" - same meaning, completely different words.
 
@@ -43,8 +48,8 @@ ${requirements || 'N/A'}
 
 Return your response as JSON only with this structure:
 {
-  "description": "completely rewritten description with HTML formatting",
-  "requirements": "completely rewritten requirements with HTML formatting"
+  "description": "completely rewritten description with HTML formatting, no dashes",
+  "requirements": "completely rewritten requirements with HTML formatting, no dashes"
 }
 
 Return ONLY valid JSON, no markdown code blocks or explanations.`
@@ -59,6 +64,14 @@ Return ONLY valid JSON, no markdown code blocks or explanations.`
     try {
       const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       result = JSON.parse(cleanJson)
+      
+      // Extra safety: remove any em dashes and replace hyphenated compound words
+      if (result.description) {
+        result.description = result.description.replace(/—/g, ', ').replace(/–/g, ', ')
+      }
+      if (result.requirements) {
+        result.requirements = result.requirements.replace(/—/g, ', ').replace(/–/g, ', ')
+      }
     } catch {
       console.error('Failed to parse response:', responseText)
       return NextResponse.json({ error: 'Failed to parse anonymized content' }, { status: 500 })
