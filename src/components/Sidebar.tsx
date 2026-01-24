@@ -8,7 +8,6 @@ import {
   Users, 
   Building2,
   FileText,
-  BarChart3,
   Settings,
   LogOut,
   ChevronLeft,
@@ -24,7 +23,6 @@ const navItems = [
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
   { label: 'Contracts', href: '/dashboard/contracts', icon: FileText },
-  { label: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
 ]
 
 const bottomNavItems = [
