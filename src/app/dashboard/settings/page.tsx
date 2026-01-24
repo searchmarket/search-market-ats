@@ -22,7 +22,8 @@ export default function SettingsPage() {
     photo_url: '',
     city: '',
     state_province: '',
-    country: ''
+    country: '',
+    is_available: true
   })
 
   const usStates = [
@@ -76,7 +77,8 @@ export default function SettingsPage() {
         photo_url: data.photo_url || '',
         city: data.city || '',
         state_province: data.state_province || '',
-        country: data.country || ''
+        country: data.country || '',
+        is_available: data.is_available !== false
       })
     }
     setLoading(false)
@@ -98,7 +100,8 @@ export default function SettingsPage() {
         company_name: profile.company_name || null,
         city: profile.city || null,
         state_province: profile.state_province || null,
-        country: profile.country || null
+        country: profile.country || null,
+        is_available: profile.is_available
       })
       .eq('id', user.id)
 
@@ -290,6 +293,38 @@ export default function SettingsPage() {
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                     placeholder="Tell candidates about yourself and your recruiting specialty..."
                   />
+                </div>
+
+                {/* Availability Toggle */}
+                <div className="border-t border-gray-100 pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Available for Collaboration</h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Let other recruiters know you're open to helping fill jobs
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProfile({ ...profile, is_available: !profile.is_available })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        profile.is_available ? 'bg-green-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          profile.is_available ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <div className={`mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    profile.is_available 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {profile.is_available ? 'Available' : 'Unavailable'}
+                  </div>
                 </div>
 
                 <button 
