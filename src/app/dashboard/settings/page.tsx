@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { User, Building2, Bell, CreditCard, Shield, Save, Globe, Loader2, ExternalLink, Copy, Check } from 'lucide-react'
+import { User, Building2, Bell, CreditCard, Shield, Save, Globe, Loader2, ExternalLink, Copy, Check, CheckCircle } from 'lucide-react'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const supabase = createClient()
 
@@ -112,8 +113,12 @@ export default function SettingsPage() {
         console.error('Error saving profile:', error)
         alert('Error saving profile')
       }
+      setSaving(false)
     } else {
-      alert('Profile saved successfully!')
+      setSaved(true)
+      setTimeout(() => {
+        window.location.href = 'https://hub.search.market'
+      }, 1000)
     }
     setSaving(false)
   }
@@ -329,11 +334,29 @@ export default function SettingsPage() {
 
                 <button 
                   onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
+                  disabled={saving || saved}
+                  className={`flex items-center gap-2 px-4 py-2.5 font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                    saved 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-brand-navy text-white hover:bg-brand-blue'
+                  }`}
                 >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saved ? (
+                    <>
+                      <CheckCircle className="w-5 h-5" />
+                      Saved! Redirecting...
+                    </>
+                  ) : saving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -412,11 +435,29 @@ export default function SettingsPage() {
 
                 <button 
                   onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
+                  disabled={saving || saved}
+                  className={`flex items-center gap-2 px-4 py-2.5 font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                    saved 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-brand-navy text-white hover:bg-brand-blue'
+                  }`}
                 >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saved ? (
+                    <>
+                      <CheckCircle className="w-5 h-5" />
+                      Saved! Redirecting...
+                    </>
+                  ) : saving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </div>

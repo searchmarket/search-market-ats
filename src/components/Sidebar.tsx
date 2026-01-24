@@ -10,7 +10,8 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Home
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
@@ -80,6 +81,14 @@ export default function Sidebar() {
 
       {/* Bottom Nav */}
       <div className="p-3 border-t border-white/10 space-y-1">
+        <a
+          href="https://hub.search.market"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <Home className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span className="font-medium">Hub</span>}
+        </a>
+        
         {bottomNavItems.map((item) => (
           <Link
             key={item.href}
