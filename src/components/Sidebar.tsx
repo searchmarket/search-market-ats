@@ -7,7 +7,6 @@ import {
   Briefcase, 
   Users, 
   Building2,
-  FileText,
   Settings,
   LogOut,
   ChevronLeft,
@@ -22,7 +21,6 @@ const navItems = [
   { label: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
-  { label: 'Contracts', href: '/dashboard/contracts', icon: FileText },
 ]
 
 const bottomNavItems = [
