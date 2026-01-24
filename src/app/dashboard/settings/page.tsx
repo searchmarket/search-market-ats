@@ -19,8 +19,27 @@ export default function SettingsPage() {
     linkedin_url: '',
     slug: '',
     company_name: '',
-    photo_url: ''
+    photo_url: '',
+    city: '',
+    state_province: '',
+    country: ''
   })
+
+  const usStates = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware',
+    'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky',
+    'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi',
+    'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico',
+    'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania',
+    'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont',
+    'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
+  ]
+
+  const canadianProvinces = [
+    'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador',
+    'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Ontario', 'Prince Edward Island',
+    'Quebec', 'Saskatchewan', 'Yukon'
+  ]
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -54,7 +73,10 @@ export default function SettingsPage() {
         linkedin_url: data.linkedin_url || '',
         slug: data.slug || '',
         company_name: data.company_name || '',
-        photo_url: data.photo_url || ''
+        photo_url: data.photo_url || '',
+        city: data.city || '',
+        state_province: data.state_province || '',
+        country: data.country || ''
       })
     }
     setLoading(false)
@@ -73,7 +95,10 @@ export default function SettingsPage() {
         bio: profile.bio || null,
         linkedin_url: profile.linkedin_url || null,
         slug: profile.slug || null,
-        company_name: profile.company_name || null
+        company_name: profile.company_name || null,
+        city: profile.city || null,
+        state_province: profile.state_province || null,
+        country: profile.country || null
       })
       .eq('id', user.id)
 
@@ -200,6 +225,60 @@ export default function SettingsPage() {
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                     placeholder="https://linkedin.com/in/yourprofile"
                   />
+                </div>
+
+                {/* Location Fields */}
+                <div className="border-t border-gray-100 pt-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Location</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                      <select
+                        value={profile.country}
+                        onChange={(e) => setProfile({ ...profile, country: e.target.value, state_province: '' })}
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      >
+                        <option value="">Select Country</option>
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {profile.country === 'Canada' ? 'Province' : 'State'}
+                      </label>
+                      <select
+                        value={profile.state_province}
+                        onChange={(e) => setProfile({ ...profile, state_province: e.target.value })}
+                        disabled={!profile.country}
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:bg-gray-50 disabled:text-gray-400"
+                      >
+                        <option value="">Select {profile.country === 'Canada' ? 'Province' : 'State'}</option>
+                        {profile.country === 'Canada' 
+                          ? canadianProvinces.map(prov => (
+                              <option key={prov} value={prov}>{prov}</option>
+                            ))
+                          : usStates.map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))
+                        }
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={profile.city}
+                      onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="Enter your city"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Used for local job news on the Hub dashboard</p>
+                  </div>
                 </div>
 
                 <div>
