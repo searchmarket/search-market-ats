@@ -17,11 +17,12 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 
-const navItems = [
+const navItems: { label: string; href: string; icon: any; external?: boolean }[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
+  { label: 'Hub', href: 'https://hub.search.market', icon: Home, external: true },
 ]
 
 const bottomNavItems = [
@@ -63,32 +64,41 @@ export default function Sidebar() {
 
       {/* Main Nav */}
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              isActive(item.href)
-                ? 'bg-white/15 text-white'
-                : 'text-white/70 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span className="font-medium">{item.label}</span>}
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          const linkClass = `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+            !item.external && isActive(item.href)
+              ? 'bg-white/15 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white'
+          }`
+          
+          if (item.external) {
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                className={linkClass}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="font-medium">{item.label}</span>}
+              </a>
+            )
+          }
+          
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={linkClass}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span className="font-medium">{item.label}</span>}
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Bottom Nav */}
       <div className="p-3 border-t border-white/10 space-y-1">
-        <a
-          href="https://hub.search.market"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <Home className="w-5 h-5 flex-shrink-0" />
-          {!collapsed && <span className="font-medium">Hub</span>}
-        </a>
-        
         {bottomNavItems.map((item) => (
           <Link
             key={item.href}
