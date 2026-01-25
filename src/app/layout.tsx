@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Search Market Hub',
+  title: 'ATS | Search.Market',
   description: 'The AI-powered platform for independent recruiters',
 }
 
