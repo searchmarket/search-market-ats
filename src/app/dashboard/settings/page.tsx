@@ -363,7 +363,7 @@ export default function SettingsPage() {
                               newSpecs.splice(index, 1)
                             }
                             // Remove duplicates and empty values
-                            const uniqueSpecs = [...new Set(newSpecs.filter(Boolean))]
+                            const uniqueSpecs = Array.from(new Set(newSpecs.filter(Boolean)))
                             setProfile({ ...profile, specializations: uniqueSpecs })
                           }}
                           className="flex-1 px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
