@@ -1,6 +1,13 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const cookieConfig = {
+  domain: '.search.market',
+  path: '/',
+  sameSite: 'lax' as const,
+  secure: true
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -17,10 +24,42 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options })
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+            ...cookieConfig,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+            ...cookieConfig,
+          })
         },
         remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options })
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+            ...cookieConfig,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+            ...cookieConfig,
+          })
         },
       },
     }
@@ -28,10 +67,13 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Protect dashboard routes - redirect to Hub for login
   if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    const redirectUrl = encodeURIComponent(request.url)
+    return NextResponse.redirect(new URL(`https://hub.search.market/auth/login?redirect=${redirectUrl}`, request.url))
   }
 
+  // Redirect logged-in users away from auth pages
   if (request.nextUrl.pathname.startsWith('/auth') && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
