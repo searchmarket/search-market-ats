@@ -2041,21 +2041,23 @@ export default function CandidatesPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="divide-y divide-gray-100">
             {filteredCandidates.map((candidate) => {
-              const isOwnedByOther = candidate.owned_by && candidate.owned_by !== currentUserId
+              const status = getOwnershipStatus(candidate)
+              const isExclusiveByOther = status === 'exclusive' && candidate.recruiter_id !== currentUserId
+              const isRestricted = isExclusiveByOther && !isAdmin
               
               return (
               <div 
                 key={candidate.id} 
                 className={`flex items-center gap-4 px-4 py-3 transition-colors ${
-                  isOwnedByOther 
+                  isRestricted 
                     ? 'bg-gray-50 opacity-60 cursor-not-allowed' 
                     : 'cursor-pointer hover:bg-gray-50 group'
                 }`}
-                onClick={() => !isOwnedByOther && openDetailView(candidate)}
+                onClick={() => !isRestricted && openDetailView(candidate)}
               >
                 {/* Avatar */}
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
-                  isOwnedByOther ? 'bg-gray-200 text-gray-500' : 'bg-brand-green/10 text-brand-green'
+                  isRestricted ? 'bg-gray-200 text-gray-500' : 'bg-brand-green/10 text-brand-green'
                 }`}>
                   {candidate.first_name[0]}{candidate.last_name[0]}
                 </div>
@@ -2063,7 +2065,7 @@ export default function CandidatesPage() {
                 {/* Name */}
                 <div className="w-36 flex-shrink-0">
                   <h3 className={`font-medium truncate text-sm ${
-                    isOwnedByOther ? 'text-gray-500' : 'text-gray-900 group-hover:text-brand-accent transition-colors'
+                    isRestricted ? 'text-gray-500' : 'text-gray-900 group-hover:text-brand-accent transition-colors'
                   }`}>
                     {candidate.first_name} {candidate.last_name}
                   </h3>
@@ -2149,8 +2151,8 @@ export default function CandidatesPage() {
 
                 {/* Menu */}
                 <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                  {/* Only show menu for owners, admins, or open candidates */}
-                  {(isOwner(candidate) || isAdmin || !candidate.owned_by) && (
+                  {/* Show menu for owners, admins, or open candidates (not for exclusive by others) */}
+                  {!isRestricted && (isOwner(candidate) || isAdmin || (status === 'open' && !candidate.owned_by)) && (
                     <>
                       <button
                         onClick={() => setMenuOpen(menuOpen === candidate.id ? null : candidate.id)}
@@ -2169,7 +2171,7 @@ export default function CandidatesPage() {
                               Edit
                             </button>
                           )}
-                          {!candidate.owned_by && !isOwner(candidate) && (
+                          {status === 'open' && !candidate.owned_by && !isOwner(candidate) && (
                             <button
                               onClick={() => { claimCandidate(candidate); setMenuOpen(null) }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-green hover:bg-gray-50"
