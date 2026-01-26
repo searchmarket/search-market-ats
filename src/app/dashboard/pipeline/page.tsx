@@ -77,7 +77,7 @@ export default function PipelinePage() {
 
   async function fetchApplications() {
     const { data, error } = await supabase
-      .from('job_applications')
+      .from('applications')
       .select(`
         id, job_id, candidate_id, stage, created_at, updated_at,
         candidate:candidates(id, first_name, last_name, email, phone, current_title, current_company, city, state),
@@ -94,7 +94,7 @@ export default function PipelinePage() {
 
   async function updateStage(applicationId: string, newStage: string) {
     const { error } = await supabase
-      .from('job_applications')
+      .from('applications')
       .update({ stage: newStage, updated_at: new Date().toISOString() })
       .eq('id', applicationId)
 

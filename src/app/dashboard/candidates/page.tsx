@@ -653,6 +653,30 @@ export default function CandidatesPage() {
     }
   }
 
+  async function handleRemoveFromJob(applicationId: string) {
+    if (!selectedCandidate) return
+    
+    // Only owners can remove candidates from jobs
+    if (!isOwner(selectedCandidate)) {
+      alert('Only the candidate owner can remove them from jobs')
+      return
+    }
+
+    if (!confirm('Are you sure you want to remove this candidate from this job?')) return
+
+    const { error } = await supabase
+      .from('applications')
+      .delete()
+      .eq('id', applicationId)
+
+    if (error) {
+      console.error('Error removing from job:', error)
+      alert('Error removing candidate from job')
+    } else {
+      fetchApplicationsForCandidate(selectedCandidate.id)
+    }
+  }
+
   function openDetailView(candidate: Candidate) {
     setSelectedCandidate(candidate)
     setShowDetailView(true)
@@ -1223,13 +1247,26 @@ export default function CandidatesPage() {
                 <div className="space-y-3">
                   {applications.map((app) => (
                     <div key={app.id} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="font-medium text-gray-900">{app.jobs.title}</div>
-                      {app.jobs.clients && (
-                        <div className="text-sm text-gray-500">{app.jobs.clients.company_name}</div>
-                      )}
-                      <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${stageColors[app.stage]}`}>
-                        {app.stage}
-                      </span>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{app.jobs.title}</div>
+                          {app.jobs.clients && (
+                            <div className="text-sm text-gray-500">{app.jobs.clients.company_name}</div>
+                          )}
+                          <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${stageColors[app.stage]}`}>
+                            {app.stage}
+                          </span>
+                        </div>
+                        {isOwner(selectedCandidate) && (
+                          <button
+                            onClick={() => handleRemoveFromJob(app.id)}
+                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                            title="Remove from job"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
