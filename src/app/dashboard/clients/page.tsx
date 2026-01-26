@@ -8,7 +8,8 @@ import { countries, provinces, industries } from '@/lib/location-data'
 import { 
   Plus, Search, Building2, MoreVertical, Pencil, Trash2, X, 
   ArrowLeft, Mail, Phone, Globe, MapPin, Briefcase, Lock, Unlock, 
-  Clock, FileText, UserPlus, Users, Loader2, Check
+  Clock, FileText, UserPlus, Users, Loader2, Check, Calendar,
+  MessageSquare, PhoneCall, Linkedin, StickyNote, Send, FileSignature
 } from 'lucide-react'
 
 interface Job {
@@ -27,6 +28,20 @@ interface ClientAccess {
   id: string
   recruiter_id: string
   recruiter: Recruiter
+}
+
+interface ClientActivityLog {
+  id: string
+  client_id: string
+  recruiter_id: string
+  activity_type: string
+  direction: string | null
+  channel: string | null
+  notes: string | null
+  metadata: any
+  duration_seconds: number | null
+  created_at: string
+  recruiter?: { full_name: string | null } | null
 }
 
 interface Client {
@@ -70,6 +85,16 @@ export default function ClientsPage() {
   const [recruiters, setRecruiters] = useState<Recruiter[]>([])
   const [showGrantAccessModal, setShowGrantAccessModal] = useState(false)
   const [selectedRecruiterId, setSelectedRecruiterId] = useState('')
+  const [activityLogs, setActivityLogs] = useState<ClientActivityLog[]>([])
+  const [showLogActivityModal, setShowLogActivityModal] = useState(false)
+  const [activityFormData, setActivityFormData] = useState({
+    activity_type: 'note',
+    channel: '',
+    direction: '',
+    notes: '',
+    duration_seconds: '',
+    call_answered: false
+  })
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -118,6 +143,7 @@ export default function ClientsPage() {
     if (selectedClient) {
       fetchJobsForClient(selectedClient.id)
       fetchClientAccess(selectedClient.id)
+      fetchActivityLogs(selectedClient.id)
     }
   }, [selectedClient])
 
@@ -190,6 +216,74 @@ export default function ClientsPage() {
       console.error('Error fetching jobs:', error)
     } else {
       setJobs((data as unknown as Job[]) || [])
+    }
+  }
+
+  async function fetchActivityLogs(clientId: string) {
+    const { data, error } = await supabase
+      .from('client_activity_logs')
+      .select('*, recruiter:recruiters(full_name)')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching activity logs:', error)
+    } else {
+      setActivityLogs((data as unknown as ClientActivityLog[]) || [])
+    }
+  }
+
+  async function submitActivity() {
+    if (!selectedClient || !currentUserId) return
+
+    const metadata: any = {}
+    if (activityFormData.activity_type === 'call') {
+      metadata.answered = activityFormData.call_answered
+      if (activityFormData.duration_seconds) {
+        metadata.duration = parseInt(activityFormData.duration_seconds)
+      }
+    }
+
+    const { error } = await supabase.from('client_activity_logs').insert([{
+      client_id: selectedClient.id,
+      recruiter_id: currentUserId,
+      activity_type: activityFormData.activity_type,
+      channel: activityFormData.channel || null,
+      direction: activityFormData.direction || null,
+      notes: activityFormData.notes || null,
+      duration_seconds: activityFormData.duration_seconds ? parseInt(activityFormData.duration_seconds) : null,
+      metadata: Object.keys(metadata).length > 0 ? metadata : null
+    }])
+
+    if (error) {
+      console.error('Error logging activity:', error)
+      alert('Error logging activity')
+    } else {
+      // Reset form
+      setActivityFormData({
+        activity_type: 'note',
+        channel: '',
+        direction: '',
+        notes: '',
+        duration_seconds: '',
+        call_answered: false
+      })
+      setShowLogActivityModal(false)
+      
+      // Refresh data
+      fetchActivityLogs(selectedClient.id)
+      
+      // Refresh client to get updated ownership timestamps
+      const { data: updatedClient } = await supabase
+        .from('clients')
+        .select('*, owner:recruiters!owned_by(full_name)')
+        .eq('id', selectedClient.id)
+        .single()
+      
+      if (updatedClient) {
+        setSelectedClient(updatedClient as unknown as Client)
+        fetchClients() // Refresh list too
+      }
     }
   }
 
@@ -269,6 +363,14 @@ export default function ClientsPage() {
       console.error('Error claiming client:', error)
       alert('Error claiming client')
     } else {
+      // Log the claim activity
+      await supabase.from('client_activity_logs').insert([{
+        client_id: client.id,
+        recruiter_id: currentUserId,
+        activity_type: 'claimed',
+        notes: 'Client claimed'
+      }])
+
       fetchClients()
       if (selectedClient?.id === client.id) {
         setSelectedClient({
@@ -280,6 +382,7 @@ export default function ClientsPage() {
           contract_signed_at: null,
           last_two_way_at: null
         })
+        fetchActivityLogs(client.id)
       }
     }
     setClaimingClient(false)
@@ -287,6 +390,15 @@ export default function ClientsPage() {
 
   async function releaseClient(client: Client) {
     if (!confirm('Are you sure you want to release this client? Another recruiter can claim them.')) return
+    if (!currentUserId) return
+
+    // Log the release activity first (before removing ownership)
+    await supabase.from('client_activity_logs').insert([{
+      client_id: client.id,
+      recruiter_id: currentUserId,
+      activity_type: 'released',
+      notes: 'Client released'
+    }])
 
     const { error } = await supabase
       .from('clients')
@@ -319,6 +431,7 @@ export default function ClientsPage() {
           last_two_way_at: null
         })
         setClientAccess([])
+        fetchActivityLogs(client.id)
       }
     }
   }
@@ -568,6 +681,32 @@ export default function ClientsPage() {
     contracted: 'Contracted'
   }
 
+  const activityTypeLabels: Record<string, string> = {
+    note: 'Note',
+    message: 'Message',
+    call: 'Call',
+    linkedin: 'LinkedIn',
+    meeting: 'Meeting',
+    client_interview: 'Client Interview',
+    contract_sent: 'Contract Sent',
+    contract_signed: 'Contract Signed',
+    claimed: 'Claimed',
+    released: 'Released'
+  }
+
+  const activityTypeIcons: Record<string, any> = {
+    note: StickyNote,
+    message: MessageSquare,
+    call: PhoneCall,
+    linkedin: Linkedin,
+    meeting: Calendar,
+    client_interview: Users,
+    contract_sent: Send,
+    contract_signed: FileSignature,
+    claimed: Lock,
+    released: Unlock
+  }
+
   const jobStatusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700',
     open: 'bg-green-100 text-green-700',
@@ -758,6 +897,99 @@ export default function ClientsPage() {
                 <p className="text-gray-600 whitespace-pre-wrap">{selectedClient.notes}</p>
               </div>
             )}
+
+            {/* Activity Log */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Activity Log ({activityLogs.length})</h2>
+                {(isOwner(selectedClient) || hasAccess(selectedClient)) && (
+                  <button
+                    onClick={() => setShowLogActivityModal(true)}
+                    className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Log Activity
+                  </button>
+                )}
+              </div>
+              {activityLogs.length === 0 ? (
+                <div className="text-center py-6 text-gray-400">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No activities logged yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {activityLogs.map((log) => {
+                    const ActivityIcon = activityTypeIcons[log.activity_type] || StickyNote
+                    const isTwoWay = (log.direction === 'inbound') || 
+                                     log.activity_type === 'client_interview' || 
+                                     log.activity_type === 'meeting' ||
+                                     (log.activity_type === 'call' && log.metadata?.answered)
+                    
+                    return (
+                      <div key={log.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          log.activity_type === 'claimed' ? 'bg-green-100 text-green-600' :
+                          log.activity_type === 'released' ? 'bg-red-100 text-red-600' :
+                          log.activity_type === 'contract_signed' ? 'bg-purple-100 text-purple-600' :
+                          isTwoWay ? 'bg-blue-100 text-blue-600' :
+                          'bg-gray-200 text-gray-600'
+                        }`}>
+                          <ActivityIcon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-gray-900 text-sm">
+                              {activityTypeLabels[log.activity_type] || log.activity_type}
+                            </span>
+                            {log.direction && (
+                              <span className={`px-1.5 py-0.5 text-xs rounded ${
+                                log.direction === 'inbound' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+                              }`}>
+                                {log.direction}
+                              </span>
+                            )}
+                            {log.channel && (
+                              <span className="px-1.5 py-0.5 text-xs bg-gray-200 text-gray-600 rounded">
+                                {log.channel}
+                              </span>
+                            )}
+                            {log.activity_type === 'call' && log.metadata?.answered && (
+                              <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+                                answered
+                              </span>
+                            )}
+                            {isTwoWay && (
+                              <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
+                                two-way ✓
+                              </span>
+                            )}
+                          </div>
+                          {log.notes && (
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{log.notes}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                            <span>{new Date(log.created_at).toLocaleString()}</span>
+                            {log.recruiter?.full_name && (
+                              <>
+                                <span>•</span>
+                                <span>{log.recruiter.full_name}</span>
+                              </>
+                            )}
+                            {log.duration_seconds && (
+                              <>
+                                <span>•</span>
+                                <span>{Math.floor(log.duration_seconds / 60)}m {log.duration_seconds % 60}s</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}
@@ -1053,6 +1285,179 @@ export default function ClientsPage() {
                   className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Grant Access
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Log Activity Modal */}
+        {showLogActivityModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Log Activity</h2>
+                <button 
+                  onClick={() => {
+                    setShowLogActivityModal(false)
+                    setActivityFormData({
+                      activity_type: 'note',
+                      channel: '',
+                      direction: '',
+                      notes: '',
+                      duration_seconds: '',
+                      call_answered: false
+                    })
+                  }} 
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Activity Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Activity Type</label>
+                  <select
+                    value={activityFormData.activity_type}
+                    onChange={(e) => setActivityFormData({ ...activityFormData, activity_type: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="note">Note</option>
+                    <option value="message">Message</option>
+                    <option value="call">Call</option>
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="client_interview">Client Interview</option>
+                    <option value="contract_sent">Contract Sent</option>
+                    <option value="contract_signed">Contract Signed</option>
+                  </select>
+                </div>
+
+                {/* Direction - for message, call, linkedin */}
+                {(activityFormData.activity_type === 'message' || activityFormData.activity_type === 'call' || activityFormData.activity_type === 'linkedin') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Direction</label>
+                    <select
+                      value={activityFormData.direction}
+                      onChange={(e) => setActivityFormData({ ...activityFormData, direction: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="">Select direction...</option>
+                      <option value="outbound">Outbound (You → Client)</option>
+                      <option value="inbound">Inbound (Client → You)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {activityFormData.direction === 'inbound' 
+                        ? '✓ Inbound = Two-way communication (resets ownership clock)' 
+                        : activityFormData.direction === 'outbound'
+                        ? '→ Outbound = Counts toward initial outreach requirement'
+                        : ''}
+                    </p>
+                  </div>
+                )}
+
+                {/* Channel - for message */}
+                {activityFormData.activity_type === 'message' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
+                    <select
+                      value={activityFormData.channel}
+                      onChange={(e) => setActivityFormData({ ...activityFormData, channel: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="">Select channel...</option>
+                      <option value="email">Email</option>
+                      <option value="text">Text/SMS</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Call Answered */}
+                {activityFormData.activity_type === 'call' && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="call_answered"
+                      checked={activityFormData.call_answered}
+                      onChange={(e) => setActivityFormData({ ...activityFormData, call_answered: e.target.checked })}
+                      className="w-4 h-4 text-brand-accent border-gray-300 rounded focus:ring-brand-accent"
+                    />
+                    <label htmlFor="call_answered" className="text-sm text-gray-700">
+                      Client answered the call
+                    </label>
+                    {activityFormData.call_answered && (
+                      <span className="text-xs text-blue-600 ml-2">✓ Two-way communication</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Duration - for call */}
+                {activityFormData.activity_type === 'call' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Duration (seconds)</label>
+                    <input
+                      type="number"
+                      value={activityFormData.duration_seconds}
+                      onChange={(e) => setActivityFormData({ ...activityFormData, duration_seconds: e.target.value })}
+                      placeholder="e.g. 300 for 5 minutes"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={activityFormData.notes}
+                    onChange={(e) => setActivityFormData({ ...activityFormData, notes: e.target.value })}
+                    rows={3}
+                    placeholder="What happened? Any important details?"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent resize-none"
+                  />
+                </div>
+
+                {/* Two-way indicator */}
+                {(activityFormData.activity_type === 'meeting' || 
+                  activityFormData.activity_type === 'client_interview' ||
+                  activityFormData.activity_type === 'contract_signed') && (
+                  <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                    ✓ This activity counts as two-way communication and will reset your ownership clock.
+                  </div>
+                )}
+
+                {activityFormData.activity_type === 'contract_signed' && (
+                  <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
+                    📜 Logging a signed contract will extend your ownership window to 3 months.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowLogActivityModal(false)
+                    setActivityFormData({
+                      activity_type: 'note',
+                      channel: '',
+                      direction: '',
+                      notes: '',
+                      duration_seconds: '',
+                      call_answered: false
+                    })
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitActivity}
+                  className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
+                >
+                  Log Activity
                 </button>
               </div>
             </div>
