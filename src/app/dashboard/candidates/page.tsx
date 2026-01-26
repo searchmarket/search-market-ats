@@ -930,10 +930,8 @@ export default function CandidatesPage() {
       return candidate.owned_by === currentUserId
     }
     if (activeTab === 'new') {
-      // New candidates: added in last 24 hours and not owned
-      const oneDayAgo = new Date()
-      oneDayAgo.setHours(oneDayAgo.getHours() - 24)
-      return !candidate.owned_by && new Date(candidate.created_at) >= oneDayAgo
+      // Unclaimed candidates: not owned by anyone
+      return !candidate.owned_by
     }
     
     return true
@@ -941,11 +939,7 @@ export default function CandidatesPage() {
 
   // Count for tabs
   const myCandidatesCount = candidates.filter(c => c.owned_by === currentUserId).length
-  const newCandidatesCount = candidates.filter(c => {
-    const oneDayAgo = new Date()
-    oneDayAgo.setHours(oneDayAgo.getHours() - 24)
-    return !c.owned_by && new Date(c.created_at) >= oneDayAgo
-  }).length
+  const unclaimedCandidatesCount = candidates.filter(c => !c.owned_by).length
 
   const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-700',
@@ -1897,12 +1891,12 @@ export default function CandidatesPage() {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          New Candidates
-          {newCandidatesCount > 0 && (
+          Unclaimed
+          {unclaimedCandidatesCount > 0 && (
             <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-              activeTab === 'new' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-orange-100 text-orange-600'
+              activeTab === 'new' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-green-100 text-green-600'
             }`}>
-              {newCandidatesCount}
+              {unclaimedCandidatesCount}
             </span>
           )}
         </button>
