@@ -1956,85 +1956,114 @@ export default function CandidatesPage() {
           )}
         </div>
       ) : (
-        <div className="grid gap-4">
-          {filteredCandidates.map((candidate) => (
-            <div 
-              key={candidate.id} 
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 cursor-pointer hover:border-brand-accent transition-colors"
-              onClick={() => openDetailView(candidate)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-brand-green/10 rounded-full flex items-center justify-center text-brand-green font-semibold text-lg">
-                    {candidate.first_name[0]}{candidate.last_name[0]}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {candidate.first_name} {candidate.last_name}
-                      </h3>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[candidate.status]}`}>
-                        {candidate.status.replace('_', ' ')}
-                      </span>
-                      {/* Ownership Badge */}
-                      {(() => {
-                        const status = getOwnershipStatus(candidate)
-                        const colors = ownershipColors[status]
-                        const Icon = colors.icon
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
-                            <Icon className="w-3 h-3" />
-                            {status === 'owned' ? (candidate.owned_by === currentUserId ? 'Mine' : 'Owned') : 
-                             status === 'exclusive' ? 'Exclusive' : 'Open'}
-                          </span>
-                        )
-                      })()}
-                    </div>
-                    {(candidate.current_title || candidate.current_company) && (
-                      <div className="flex items-center gap-1 text-gray-600 mb-2">
-                        <Briefcase className="w-4 h-4" />
-                        {[candidate.current_title, candidate.current_company].filter(Boolean).join(' at ')}
-                      </div>
-                    )}
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-                      {candidate.email && (
-                        <div className="flex items-center gap-1">
-                          <Mail className="w-4 h-4" />
-                          {candidate.email}
-                        </div>
-                      )}
-                      {formatLocation(candidate.city, candidate.state, candidate.country) && (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {formatLocation(candidate.city, candidate.state, candidate.country)}
-                        </div>
-                      )}
-                    </div>
-                    {candidate.skills && candidate.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {candidate.skills.slice(0, 5).map((skill, i) => (
-                          <span key={i} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                            {skill}
-                          </span>
-                        ))}
-                        {candidate.skills.length > 5 && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
-                            +{candidate.skills.length - 5} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="divide-y divide-gray-100">
+            {filteredCandidates.map((candidate) => (
+              <div 
+                key={candidate.id} 
+                className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors group"
+                onClick={() => openDetailView(candidate)}
+              >
+                {/* Avatar */}
+                <div className="w-9 h-9 bg-brand-green/10 rounded-full flex items-center justify-center text-brand-green font-semibold text-sm flex-shrink-0">
+                  {candidate.first_name[0]}{candidate.last_name[0]}
                 </div>
-                <div className="relative" onClick={(e) => e.stopPropagation()}>
+
+                {/* Name */}
+                <div className="w-36 flex-shrink-0">
+                  <h3 className="font-medium text-gray-900 group-hover:text-brand-accent transition-colors truncate text-sm">
+                    {candidate.first_name} {candidate.last_name}
+                  </h3>
+                </div>
+
+                {/* Title/Company */}
+                <div className="w-48 flex-shrink-0 hidden md:block">
+                  {candidate.current_title ? (
+                    <div className="text-sm text-gray-600 truncate">
+                      {candidate.current_title}
+                      {candidate.current_company && <span className="text-gray-400"> @ {candidate.current_company}</span>}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                  )}
+                </div>
+
+                {/* Location */}
+                <div className="w-32 flex-shrink-0 hidden lg:block">
+                  {formatLocation(candidate.city, candidate.state, candidate.country) ? (
+                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{formatLocation(candidate.city, candidate.state, candidate.country)}</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                  )}
+                </div>
+
+                {/* LinkedIn */}
+                <div className="w-8 flex-shrink-0 flex justify-center" onClick={(e) => e.stopPropagation()}>
+                  {candidate.linkedin_url ? (
+                    <a
+                      href={candidate.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        window.open(candidate.linkedin_url!, '_blank')
+                      }}
+                      className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                      title="View LinkedIn Profile"
+                    >
+                      <Linkedin className="w-4 h-4" />
+                    </a>
+                  ) : (
+                    <span className="p-1 text-gray-300">
+                      <Linkedin className="w-4 h-4" />
+                    </span>
+                  )}
+                </div>
+
+                {/* Status Badges */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[candidate.status]}`}>
+                    {candidate.status.replace('_', ' ')}
+                  </span>
+                  {(() => {
+                    const status = getOwnershipStatus(candidate)
+                    const colors = ownershipColors[status]
+                    const Icon = colors.icon
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
+                        <Icon className="w-3 h-3" />
+                        {status === 'owned' ? (candidate.owned_by === currentUserId ? 'Mine' : 'Owned') : 
+                         status === 'exclusive' ? 'Exclusive' : 'Open'}
+                      </span>
+                    )
+                  })()}
+                </div>
+
+                {/* Skills (hidden on small screens) */}
+                <div className="flex-1 hidden xl:flex items-center gap-1 overflow-hidden">
+                  {candidate.skills && candidate.skills.length > 0 ? (
+                    candidate.skills.slice(0, 2).map((skill, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full truncate">
+                        {skill}
+                      </span>
+                    ))
+                  ) : null}
+                </div>
+
+                {/* Menu */}
+                <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => setMenuOpen(menuOpen === candidate.id ? null : candidate.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
+                    className="p-1.5 hover:bg-gray-100 rounded"
                   >
-                    <MoreVertical className="w-5 h-5 text-gray-400" />
+                    <MoreVertical className="w-4 h-4 text-gray-400" />
                   </button>
                   {menuOpen === candidate.id && (
-                    <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                    <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
                       <button
                         onClick={() => openEditModal(candidate)}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -2053,8 +2082,8 @@ export default function CandidatesPage() {
                   )}
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
