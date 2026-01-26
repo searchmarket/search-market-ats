@@ -941,7 +941,8 @@ export default function CandidatesPage() {
     message: 'Message',
     call: 'Phone Call',
     meeting: 'Meeting',
-    interview: 'Interview',
+    recruiter_interview: 'Recruiter Interview',
+    client_interview: 'Client Interview',
     note: 'Note',
     status_change: 'Status Change',
     claimed: 'Claimed',
@@ -1185,7 +1186,7 @@ export default function CandidatesPage() {
                          log.channel === 'email' ? <Mail className="w-4 h-4" /> :
                          log.channel === 'phone' ? <PhoneCall className="w-4 h-4" /> :
                          log.channel === 'sms' ? <MessageSquare className="w-4 h-4" /> :
-                         log.activity_type === 'meeting' || log.activity_type === 'interview' ? <Calendar className="w-4 h-4" /> :
+                         log.activity_type === 'meeting' || log.activity_type === 'recruiter_interview' || log.activity_type === 'client_interview' ? <Calendar className="w-4 h-4" /> :
                          <FileText className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1465,7 +1466,8 @@ export default function CandidatesPage() {
                     <option value="message">Message</option>
                     <option value="call">Phone Call</option>
                     <option value="meeting">Meeting</option>
-                    <option value="interview">Interview</option>
+                    <option value="recruiter_interview">Recruiter Interview</option>
+                    <option value="client_interview">Client Interview</option>
                   </select>
                 </div>
 
