@@ -1595,12 +1595,12 @@ export default function ClientsPage() {
                 return (
                   <tr 
                     key={client.id} 
-                    className={`cursor-pointer transition-colors ${
+                    className={`transition-colors ${
                       isOwnedByOther 
-                        ? 'bg-gray-50 opacity-60 hover:opacity-80' 
-                        : 'hover:bg-gray-50'
+                        ? 'bg-gray-50 opacity-60 cursor-not-allowed' 
+                        : 'hover:bg-gray-50 cursor-pointer'
                     }`}
-                    onClick={() => openDetailView(client)}
+                    onClick={() => !isOwnedByOther && openDetailView(client)}
                   >
                     <td className="px-6 py-4">
                       <div className={`font-medium ${isOwnedByOther ? 'text-gray-500' : 'text-gray-900'}`}>
@@ -1643,54 +1643,56 @@ export default function ClientsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 relative" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => setMenuOpen(menuOpen === client.id ? null : client.id)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        <MoreVertical className="w-5 h-5 text-gray-400" />
-                      </button>
-                      {menuOpen === client.id && (
-                        <div className="absolute right-6 top-12 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
-                          {canClaim(client) && (
-                            <button
-                              onClick={() => { claimClient(client); setMenuOpen(null) }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-green hover:bg-gray-50"
-                            >
-                              <Lock className="w-4 h-4" />
-                              Claim
-                            </button>
-                          )}
-                          {isOwner(client) && (
-                            <>
-                              <button
-                                onClick={() => openEditModal(client)}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                <Pencil className="w-4 h-4" />
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => { releaseClient(client); setMenuOpen(null) }}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-gray-50"
-                              >
-                                <Unlock className="w-4 h-4" />
-                                Release
-                              </button>
-                              <button
-                                onClick={() => handleDelete(client.id)}
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Delete
-                              </button>
-                            </>
-                          )}
-                          {!isOwner(client) && !canClaim(client) && (
-                            <div className="px-4 py-2 text-sm text-gray-400">
-                              View only
+                      {/* Only show menu for owners, admins, or claimable clients */}
+                      {(isOwner(client) || isAdmin || canClaim(client)) && (
+                        <>
+                          <button
+                            onClick={() => setMenuOpen(menuOpen === client.id ? null : client.id)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                          >
+                            <MoreVertical className="w-5 h-5 text-gray-400" />
+                          </button>
+                          {menuOpen === client.id && (
+                            <div className="absolute right-6 top-12 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
+                              {canClaim(client) && (
+                                <button
+                                  onClick={() => { claimClient(client); setMenuOpen(null) }}
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-green hover:bg-gray-50"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                  Claim
+                                </button>
+                              )}
+                              {isOwner(client) && (
+                                <>
+                                  <button
+                                    onClick={() => openEditModal(client)}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => { releaseClient(client); setMenuOpen(null) }}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-gray-50"
+                                  >
+                                    <Unlock className="w-4 h-4" />
+                                    Release
+                                  </button>
+                                </>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleDelete(client.id)}
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           )}
-                        </div>
+                        </>
                       )}
                     </td>
                   </tr>

@@ -430,6 +430,86 @@ export default function CandidatesPage() {
     return candidate.owned_by === currentUserId
   }
 
+  async function claimCandidate(candidate: Candidate) {
+    if (!currentUserId) return
+    
+    setClaimingCandidate(true)
+
+    const { error } = await supabase
+      .from('candidates')
+      .update({
+        owned_by: currentUserId,
+        owned_at: new Date().toISOString()
+      })
+      .eq('id', candidate.id)
+
+    if (error) {
+      console.error('Error claiming candidate:', error)
+      alert('Error claiming candidate')
+    } else {
+      // Log the claim activity
+      await supabase.from('activity_logs').insert([{
+        candidate_id: candidate.id,
+        recruiter_id: currentUserId,
+        activity_type: 'claimed',
+        channel: 'system',
+        notes: 'Candidate claimed'
+      }])
+
+      // Refresh data
+      fetchCandidates()
+      if (selectedCandidate?.id === candidate.id) {
+        setSelectedCandidate({
+          ...selectedCandidate,
+          owned_by: currentUserId,
+          owned_at: new Date().toISOString()
+        })
+        fetchActivityLogs(candidate.id)
+      }
+    }
+
+    setClaimingCandidate(false)
+  }
+
+  async function releaseCandidate(candidate: Candidate) {
+    if (!currentUserId) return
+    
+    if (!confirm('Are you sure you want to release this candidate? Another recruiter can claim them.')) return
+
+    const { error } = await supabase
+      .from('candidates')
+      .update({
+        owned_by: null,
+        owned_at: null
+      })
+      .eq('id', candidate.id)
+
+    if (error) {
+      console.error('Error releasing candidate:', error)
+      alert('Error releasing candidate')
+    } else {
+      // Log the release activity
+      await supabase.from('activity_logs').insert([{
+        candidate_id: candidate.id,
+        recruiter_id: currentUserId,
+        activity_type: 'released',
+        channel: 'system',
+        notes: 'Candidate released'
+      }])
+
+      // Refresh data
+      fetchCandidates()
+      if (selectedCandidate?.id === candidate.id) {
+        setSelectedCandidate({
+          ...selectedCandidate,
+          owned_by: null,
+          owned_at: null
+        })
+        fetchActivityLogs(candidate.id)
+      }
+    }
+  }
+
   async function handleClaimCandidate() {
     if (!selectedCandidate || !currentUserId) return
     
@@ -1420,13 +1500,15 @@ export default function CandidatesPage() {
                   )}
                   {generatingResume ? 'Generating...' : 'Generate Resume'}
                 </button>
-                <button
-                  onClick={() => handleDelete(selectedCandidate.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Candidate
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDelete(selectedCandidate.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50 rounded-lg"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Candidate
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1958,20 +2040,31 @@ export default function CandidatesPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="divide-y divide-gray-100">
-            {filteredCandidates.map((candidate) => (
+            {filteredCandidates.map((candidate) => {
+              const isOwnedByOther = candidate.owned_by && candidate.owned_by !== currentUserId
+              
+              return (
               <div 
                 key={candidate.id} 
-                className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors group"
-                onClick={() => openDetailView(candidate)}
+                className={`flex items-center gap-4 px-4 py-3 transition-colors ${
+                  isOwnedByOther 
+                    ? 'bg-gray-50 opacity-60 cursor-not-allowed' 
+                    : 'cursor-pointer hover:bg-gray-50 group'
+                }`}
+                onClick={() => !isOwnedByOther && openDetailView(candidate)}
               >
                 {/* Avatar */}
-                <div className="w-9 h-9 bg-brand-green/10 rounded-full flex items-center justify-center text-brand-green font-semibold text-sm flex-shrink-0">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
+                  isOwnedByOther ? 'bg-gray-200 text-gray-500' : 'bg-brand-green/10 text-brand-green'
+                }`}>
                   {candidate.first_name[0]}{candidate.last_name[0]}
                 </div>
 
                 {/* Name */}
                 <div className="w-36 flex-shrink-0">
-                  <h3 className="font-medium text-gray-900 group-hover:text-brand-accent transition-colors truncate text-sm">
+                  <h3 className={`font-medium truncate text-sm ${
+                    isOwnedByOther ? 'text-gray-500' : 'text-gray-900 group-hover:text-brand-accent transition-colors'
+                  }`}>
                     {candidate.first_name} {candidate.last_name}
                   </h3>
                 </div>
@@ -2056,33 +2149,61 @@ export default function CandidatesPage() {
 
                 {/* Menu */}
                 <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => setMenuOpen(menuOpen === candidate.id ? null : candidate.id)}
-                    className="p-1.5 hover:bg-gray-100 rounded"
-                  >
-                    <MoreVertical className="w-4 h-4 text-gray-400" />
-                  </button>
-                  {menuOpen === candidate.id && (
-                    <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                  {/* Only show menu for owners, admins, or open candidates */}
+                  {(isOwner(candidate) || isAdmin || !candidate.owned_by) && (
+                    <>
                       <button
-                        onClick={() => openEditModal(candidate)}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setMenuOpen(menuOpen === candidate.id ? null : candidate.id)}
+                        className="p-1.5 hover:bg-gray-100 rounded"
                       >
-                        <Pencil className="w-4 h-4" />
-                        Edit
+                        <MoreVertical className="w-4 h-4 text-gray-400" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(candidate.id)}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                      </button>
-                    </div>
+                      {menuOpen === candidate.id && (
+                        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                          {isOwner(candidate) && (
+                            <button
+                              onClick={() => openEditModal(candidate)}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Pencil className="w-4 h-4" />
+                              Edit
+                            </button>
+                          )}
+                          {!candidate.owned_by && !isOwner(candidate) && (
+                            <button
+                              onClick={() => { claimCandidate(candidate); setMenuOpen(null) }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-green hover:bg-gray-50"
+                            >
+                              <Lock className="w-4 h-4" />
+                              Claim
+                            </button>
+                          )}
+                          {isOwner(candidate) && (
+                            <button
+                              onClick={() => { releaseCandidate(candidate); setMenuOpen(null) }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-gray-50"
+                            >
+                              <Unlock className="w-4 h-4" />
+                              Release
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDelete(candidate.id)}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
