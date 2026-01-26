@@ -53,11 +53,13 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="p-4 border-b border-white/10">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-brand-green rounded-lg flex items-center justify-center text-white font-bold text-sm">
-            SM
+          <div className="w-8 h-8 bg-brand-green rounded-lg flex items-center justify-center text-white font-bold text-xs">
+            ATS
           </div>
           {!collapsed && (
-            <span className="text-white font-semibold text-lg">Search Market</span>
+            <span className="text-white font-semibold text-lg">
+              Search<span className="text-sky-400">.</span>Market
+            </span>
           )}
         </Link>
       </div>
