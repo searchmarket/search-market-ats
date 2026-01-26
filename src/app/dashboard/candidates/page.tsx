@@ -930,10 +930,10 @@ export default function CandidatesPage() {
       return candidate.owned_by === currentUserId
     }
     if (activeTab === 'new') {
-      // New candidates: added in last 7 days and not owned
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      return !candidate.owned_by && new Date(candidate.created_at) >= sevenDaysAgo
+      // New candidates: added in last 24 hours and not owned
+      const oneDayAgo = new Date()
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24)
+      return !candidate.owned_by && new Date(candidate.created_at) >= oneDayAgo
     }
     
     return true
@@ -942,9 +942,9 @@ export default function CandidatesPage() {
   // Count for tabs
   const myCandidatesCount = candidates.filter(c => c.owned_by === currentUserId).length
   const newCandidatesCount = candidates.filter(c => {
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    return !c.owned_by && new Date(c.created_at) >= sevenDaysAgo
+    const oneDayAgo = new Date()
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24)
+    return !c.owned_by && new Date(c.created_at) >= oneDayAgo
   }).length
 
   const statusColors: Record<string, string> = {
