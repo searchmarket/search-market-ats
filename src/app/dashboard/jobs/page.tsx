@@ -54,6 +54,7 @@ interface Job {
   requirements: string | null
   is_published: boolean
   created_at: string
+  recruiter_id: string
 }
 
 export default function JobsPage() {
@@ -62,6 +63,7 @@ export default function JobsPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'mine' | 'platform'>('mine')
   const [showModal, setShowModal] = useState(false)
   const [showDetailView, setShowDetailView] = useState(false)
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
@@ -131,7 +133,7 @@ export default function JobsPage() {
   async function fetchJobs() {
     const { data, error } = await supabase
       .from('jobs')
-      .select('*, clients(id, company_name)')
+      .select('*, clients(id, company_name), recruiter_id')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -443,10 +445,30 @@ export default function JobsPage() {
     setEditingJob(null)
   }
 
-  const filteredJobs = jobs.filter(job =>
-    job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    job.clients?.company_name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Only show open jobs, filtered by tab
+  const filteredJobs = jobs.filter(job => {
+    // Only show open jobs
+    if (job.status !== 'open') return false
+    
+    // Search filter
+    const matchesSearch = 
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.clients?.company_name.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    if (!matchesSearch) return false
+    
+    // Tab filter
+    if (activeTab === 'mine') {
+      return job.recruiter_id === currentUserId
+    } else {
+      // Platform jobs - all open jobs from other recruiters
+      return job.recruiter_id !== currentUserId
+    }
+  })
+
+  // Counts for tabs
+  const myJobsCount = jobs.filter(j => j.status === 'open' && j.recruiter_id === currentUserId).length
+  const platformJobsCount = jobs.filter(j => j.status === 'open' && j.recruiter_id !== currentUserId).length
 
   const statusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700',
@@ -923,8 +945,43 @@ export default function JobsPage() {
         </button>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 relative">
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab('mine')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'mine'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          My Jobs
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'mine' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {myJobsCount}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('platform')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'platform'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Platform Jobs
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'platform' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {platformJobsCount}
+          </span>
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -944,12 +1001,16 @@ export default function JobsPage() {
             <Briefcase className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {searchQuery ? 'No jobs found' : 'No jobs yet'}
+            {searchQuery ? 'No jobs found' : activeTab === 'mine' ? 'No open jobs' : 'No platform jobs'}
           </h3>
           <p className="text-gray-500 mb-6 max-w-md mx-auto">
-            {searchQuery ? 'Try a different search term' : 'Post your first job to start tracking candidates and placements.'}
+            {searchQuery 
+              ? 'Try a different search term' 
+              : activeTab === 'mine' 
+                ? 'Post a new job to start tracking candidates and placements.'
+                : 'No open jobs from other recruiters at this time.'}
           </p>
-          {!searchQuery && (
+          {!searchQuery && activeTab === 'mine' && (
             <button
               onClick={() => setShowModal(true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
