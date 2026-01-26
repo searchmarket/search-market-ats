@@ -229,11 +229,11 @@ export default function PipelinePage() {
 
       {/* Kanban Board */}
       <div className="flex-1 overflow-x-auto p-6 bg-gray-100">
-        <div className="flex gap-4 h-full min-w-max">
+        <div className="flex gap-4 h-full" style={{ minWidth: 'max-content' }}>
           {STAGES.map((stage) => (
             <div
               key={stage.id}
-              className={`w-72 flex-shrink-0 flex flex-col bg-gray-50 rounded-xl border-2 transition-colors ${
+              className={`flex-1 min-w-[200px] max-w-[350px] flex flex-col bg-gray-50 rounded-xl border-2 transition-colors ${
                 dragOverStage === stage.id 
                   ? 'border-brand-accent bg-blue-50' 
                   : 'border-transparent'
