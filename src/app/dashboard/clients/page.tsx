@@ -7,13 +7,26 @@ import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces, industries } from '@/lib/location-data'
 import { 
   Plus, Search, Building2, MoreVertical, Pencil, Trash2, X, 
-  ArrowLeft, Mail, Phone, Globe, MapPin, Briefcase
+  ArrowLeft, Mail, Phone, Globe, MapPin, Briefcase, Lock, Unlock, 
+  Clock, FileText, UserPlus, Users, Loader2, Check
 } from 'lucide-react'
 
 interface Job {
   id: string
   title: string
   status: string
+}
+
+interface Recruiter {
+  id: string
+  full_name: string | null
+  email: string
+}
+
+interface ClientAccess {
+  id: string
+  recruiter_id: string
+  recruiter: Recruiter
 }
 
 interface Client {
@@ -30,6 +43,13 @@ interface Client {
   notes: string | null
   status: string
   created_at: string
+  owned_by: string | null
+  owned_at: string | null
+  first_outbound_at: string | null
+  two_way_established_at: string | null
+  contract_signed_at: string | null
+  last_two_way_at: string | null
+  owner?: { full_name: string | null } | null
 }
 
 export default function ClientsPage() {
@@ -42,6 +62,14 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [activeTab, setActiveTab] = useState<'mine' | 'unclaimed' | 'all'>('mine')
+  const [claimingClient, setClaimingClient] = useState(false)
+  const [clientAccess, setClientAccess] = useState<ClientAccess[]>([])
+  const [recruiters, setRecruiters] = useState<Recruiter[]>([])
+  const [showGrantAccessModal, setShowGrantAccessModal] = useState(false)
+  const [selectedRecruiterId, setSelectedRecruiterId] = useState('')
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -75,7 +103,9 @@ export default function ClientsPage() {
   }, [searchParams, clients])
 
   useEffect(() => {
+    getCurrentUser()
     fetchClients()
+    fetchRecruiters()
   }, [])
 
   useEffect(() => {
@@ -87,13 +117,32 @@ export default function ClientsPage() {
   useEffect(() => {
     if (selectedClient) {
       fetchJobsForClient(selectedClient.id)
+      fetchClientAccess(selectedClient.id)
     }
   }, [selectedClient])
+
+  async function getCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setCurrentUserId(user.id)
+      
+      // Check if user is admin
+      const { data: recruiter } = await supabase
+        .from('recruiters')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
+      
+      if (recruiter?.is_admin) {
+        setIsAdmin(true)
+      }
+    }
+  }
 
   async function fetchClients() {
     const { data, error } = await supabase
       .from('clients')
-      .select('*')
+      .select('*, owner:recruiters!owned_by(full_name)')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -102,6 +151,32 @@ export default function ClientsPage() {
       setClients((data as unknown as Client[]) || [])
     }
     setLoading(false)
+  }
+
+  async function fetchRecruiters() {
+    const { data, error } = await supabase
+      .from('recruiters')
+      .select('id, full_name, email')
+      .order('full_name')
+
+    if (error) {
+      console.error('Error fetching recruiters:', error)
+    } else {
+      setRecruiters((data as unknown as Recruiter[]) || [])
+    }
+  }
+
+  async function fetchClientAccess(clientId: string) {
+    const { data, error } = await supabase
+      .from('client_access')
+      .select('id, recruiter_id, recruiter:recruiters(id, full_name, email)')
+      .eq('client_id', clientId)
+
+    if (error) {
+      console.error('Error fetching client access:', error)
+    } else {
+      setClientAccess((data as unknown as ClientAccess[]) || [])
+    }
   }
 
   async function fetchJobsForClient(clientId: string) {
@@ -115,6 +190,199 @@ export default function ClientsPage() {
       console.error('Error fetching jobs:', error)
     } else {
       setJobs((data as unknown as Job[]) || [])
+    }
+  }
+
+  // Ownership status calculation
+  function getOwnershipStatus(client: Client): 'open' | 'claimed' | 'claimed_plus' | 'engaged' | 'contracted' | 'expired' {
+    if (!client.owned_by) return 'open'
+    
+    const now = new Date()
+    
+    // If contract signed, check 3-month window
+    if (client.contract_signed_at) {
+      if (!client.last_two_way_at || new Date(client.last_two_way_at) < new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)) {
+        return 'expired'
+      }
+      return 'contracted'
+    }
+    
+    // If two-way established, check 1-month window
+    if (client.two_way_established_at) {
+      if (!client.last_two_way_at || new Date(client.last_two_way_at) < new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)) {
+        return 'expired'
+      }
+      return 'engaged'
+    }
+    
+    // If first outbound logged, check 7-day window
+    if (client.first_outbound_at) {
+      if (new Date(client.first_outbound_at) < new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)) {
+        return 'expired'
+      }
+      return 'claimed_plus'
+    }
+    
+    // If just claimed, check 24-hour window
+    if (client.owned_at) {
+      if (new Date(client.owned_at) < new Date(now.getTime() - 24 * 60 * 60 * 1000)) {
+        return 'expired'
+      }
+      return 'claimed'
+    }
+    
+    return 'open'
+  }
+
+  function isOwner(client: Client): boolean {
+    return client.owned_by === currentUserId
+  }
+
+  function hasAccess(client: Client): boolean {
+    if (isOwner(client)) return true
+    if (isAdmin) return true
+    return clientAccess.some(ca => ca.recruiter_id === currentUserId)
+  }
+
+  function canClaim(client: Client): boolean {
+    const status = getOwnershipStatus(client)
+    return status === 'open' || status === 'expired'
+  }
+
+  async function claimClient(client: Client) {
+    if (!currentUserId) return
+    setClaimingClient(true)
+
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        owned_by: currentUserId,
+        owned_at: new Date().toISOString(),
+        first_outbound_at: null,
+        two_way_established_at: null,
+        contract_signed_at: null,
+        last_two_way_at: null
+      })
+      .eq('id', client.id)
+
+    if (error) {
+      console.error('Error claiming client:', error)
+      alert('Error claiming client')
+    } else {
+      fetchClients()
+      if (selectedClient?.id === client.id) {
+        setSelectedClient({
+          ...selectedClient,
+          owned_by: currentUserId,
+          owned_at: new Date().toISOString(),
+          first_outbound_at: null,
+          two_way_established_at: null,
+          contract_signed_at: null,
+          last_two_way_at: null
+        })
+      }
+    }
+    setClaimingClient(false)
+  }
+
+  async function releaseClient(client: Client) {
+    if (!confirm('Are you sure you want to release this client? Another recruiter can claim them.')) return
+
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        owned_by: null,
+        owned_at: null,
+        first_outbound_at: null,
+        two_way_established_at: null,
+        contract_signed_at: null,
+        last_two_way_at: null
+      })
+      .eq('id', client.id)
+
+    if (error) {
+      console.error('Error releasing client:', error)
+      alert('Error releasing client')
+    } else {
+      // Also remove all granted access
+      await supabase.from('client_access').delete().eq('client_id', client.id)
+      
+      fetchClients()
+      if (selectedClient?.id === client.id) {
+        setSelectedClient({
+          ...selectedClient,
+          owned_by: null,
+          owned_at: null,
+          first_outbound_at: null,
+          two_way_established_at: null,
+          contract_signed_at: null,
+          last_two_way_at: null
+        })
+        setClientAccess([])
+      }
+    }
+  }
+
+  async function grantAccess() {
+    if (!selectedClient || !selectedRecruiterId || !currentUserId) return
+
+    const { error } = await supabase
+      .from('client_access')
+      .insert({
+        client_id: selectedClient.id,
+        recruiter_id: selectedRecruiterId,
+        granted_by: currentUserId
+      })
+
+    if (error) {
+      console.error('Error granting access:', error)
+      alert('Error granting access')
+    } else {
+      fetchClientAccess(selectedClient.id)
+      setShowGrantAccessModal(false)
+      setSelectedRecruiterId('')
+    }
+  }
+
+  async function revokeAccess(accessId: string) {
+    if (!confirm('Remove this recruiter\'s access to this client?')) return
+
+    const { error } = await supabase
+      .from('client_access')
+      .delete()
+      .eq('id', accessId)
+
+    if (error) {
+      console.error('Error revoking access:', error)
+      alert('Error revoking access')
+    } else {
+      if (selectedClient) {
+        fetchClientAccess(selectedClient.id)
+      }
+    }
+  }
+
+  async function markContractSigned() {
+    if (!selectedClient || !isOwner(selectedClient)) return
+
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        contract_signed_at: new Date().toISOString(),
+        last_two_way_at: new Date().toISOString()
+      })
+      .eq('id', selectedClient.id)
+
+    if (error) {
+      console.error('Error marking contract signed:', error)
+      alert('Error marking contract signed')
+    } else {
+      fetchClients()
+      setSelectedClient({
+        ...selectedClient,
+        contract_signed_at: new Date().toISOString(),
+        last_two_way_at: new Date().toISOString()
+      })
     }
   }
 
@@ -159,7 +427,12 @@ export default function ClientsPage() {
     } else {
       const { error } = await supabase
         .from('clients')
-        .insert([{ ...clientData, recruiter_id: user.id }])
+        .insert([{ 
+          ...clientData, 
+          recruiter_id: user.id,
+          owned_by: user.id,
+          owned_at: new Date().toISOString()
+        }])
 
       if (error) {
         console.error('Error creating client:', error)
@@ -236,16 +509,63 @@ export default function ClientsPage() {
     setEditingClient(null)
   }
 
-  const filteredClients = clients.filter(client =>
-    client.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.primary_contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.industry?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredClients = clients.filter(client => {
+    // Search filter
+    const matchesSearch = 
+      client.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.primary_contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.industry?.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    if (!matchesSearch) return false
+
+    // Check ownership status for expired clients
+    const status = getOwnershipStatus(client)
+    const effectivelyOwned = client.owned_by && status !== 'expired'
+
+    // Tab filter
+    if (activeTab === 'mine') {
+      return client.owned_by === currentUserId && status !== 'expired'
+    }
+    if (activeTab === 'unclaimed') {
+      return !effectivelyOwned
+    }
+    
+    return true
+  })
+
+  // Counts for tabs
+  const myClientsCount = clients.filter(c => {
+    const status = getOwnershipStatus(c)
+    return c.owned_by === currentUserId && status !== 'expired'
+  }).length
+  
+  const unclaimedClientsCount = clients.filter(c => {
+    const status = getOwnershipStatus(c)
+    return !c.owned_by || status === 'expired'
+  }).length
 
   const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-700',
     inactive: 'bg-gray-100 text-gray-700',
     prospect: 'bg-blue-100 text-blue-700'
+  }
+
+  const ownershipColors: Record<string, { bg: string; text: string; icon: any }> = {
+    open: { bg: 'bg-green-100', text: 'text-green-700', icon: Unlock },
+    expired: { bg: 'bg-green-100', text: 'text-green-700', icon: Unlock },
+    claimed: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
+    claimed_plus: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
+    engaged: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Lock },
+    contracted: { bg: 'bg-purple-100', text: 'text-purple-700', icon: FileText }
+  }
+
+  const ownershipLabels: Record<string, string> = {
+    open: 'Open',
+    expired: 'Open',
+    claimed: 'Claimed (24hr)',
+    claimed_plus: 'Claimed (7 day)',
+    engaged: 'Engaged',
+    contracted: 'Contracted'
   }
 
   const jobStatusColors: Record<string, string> = {
@@ -263,6 +583,11 @@ export default function ClientsPage() {
 
   // Detail View
   if (showDetailView && selectedClient) {
+    const ownershipStatus = getOwnershipStatus(selectedClient)
+    const colors = ownershipColors[ownershipStatus]
+    const OwnershipIcon = colors.icon
+    const isOwnedByOther = selectedClient.owned_by && selectedClient.owned_by !== currentUserId && ownershipStatus !== 'expired'
+
     return (
       <div className="p-8">
         <button
@@ -289,20 +614,95 @@ export default function ClientsPage() {
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[selectedClient.status]}`}>
                         {selectedClient.status}
                       </span>
+                      {/* Ownership Badge */}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
+                        <OwnershipIcon className="w-3 h-3" />
+                        {ownershipLabels[ownershipStatus]}
+                        {selectedClient.owned_by && ownershipStatus !== 'expired' && (
+                          <span className="ml-1">
+                            ({selectedClient.owned_by === currentUserId ? 'You' : selectedClient.owner?.full_name || 'Another'})
+                          </span>
+                        )}
+                      </span>
                     </div>
                     {selectedClient.industry && (
                       <p className="text-gray-600">{selectedClient.industry}</p>
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => openEditModal(selectedClient)}
-                  className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Claim Button */}
+                  {canClaim(selectedClient) && (
+                    <button
+                      onClick={() => claimClient(selectedClient)}
+                      disabled={claimingClient}
+                      className="flex items-center gap-2 px-3 py-2 bg-brand-green text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {claimingClient ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                      Claim
+                    </button>
+                  )}
+                  {/* Release Button */}
+                  {isOwner(selectedClient) && (
+                    <button
+                      onClick={() => releaseClient(selectedClient)}
+                      className="flex items-center gap-2 px-3 py-2 border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50"
+                    >
+                      <Unlock className="w-4 h-4" />
+                      Release
+                    </button>
+                  )}
+                  {/* Edit Button - only for owner or granted */}
+                  {(isOwner(selectedClient) || isAdmin) && (
+                    <button
+                      onClick={() => openEditModal(selectedClient)}
+                      className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Edit
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Ownership Timeline - only for owner */}
+              {isOwner(selectedClient) && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm font-medium text-gray-700 mb-2">Ownership Timeline</div>
+                  <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+                    <div>
+                      <span className="text-gray-400">Claimed:</span>{' '}
+                      {selectedClient.owned_at ? new Date(selectedClient.owned_at).toLocaleDateString() : '-'}
+                    </div>
+                    <div>
+                      <span className="text-gray-400">First Outbound:</span>{' '}
+                      {selectedClient.first_outbound_at ? new Date(selectedClient.first_outbound_at).toLocaleDateString() : '-'}
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Two-Way:</span>{' '}
+                      {selectedClient.two_way_established_at ? new Date(selectedClient.two_way_established_at).toLocaleDateString() : '-'}
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Contract:</span>{' '}
+                      {selectedClient.contract_signed_at ? new Date(selectedClient.contract_signed_at).toLocaleDateString() : '-'}
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Last Two-Way:</span>{' '}
+                      {selectedClient.last_two_way_at ? new Date(selectedClient.last_two_way_at).toLocaleDateString() : '-'}
+                    </div>
+                  </div>
+                  {/* Mark Contract Signed Button */}
+                  {!selectedClient.contract_signed_at && selectedClient.two_way_established_at && (
+                    <button
+                      onClick={markContractSigned}
+                      className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Mark Contract Signed
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Contact & Location */}
               <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-100">
@@ -362,6 +762,45 @@ export default function ClientsPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Granted Access - only for owner */}
+            {isOwner(selectedClient) && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Shared Access ({clientAccess.length})</h2>
+                  <button
+                    onClick={() => setShowGrantAccessModal(true)}
+                    className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
+                {clientAccess.length === 0 ? (
+                  <p className="text-sm text-gray-500">No other recruiters have access</p>
+                ) : (
+                  <div className="space-y-2">
+                    {clientAccess.map((access) => (
+                      <div key={access.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {access.recruiter?.full_name || access.recruiter?.email}
+                          </div>
+                          <div className="text-xs text-gray-500">{access.recruiter?.email}</div>
+                        </div>
+                        <button
+                          onClick={() => revokeAccess(access.id)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                          title="Remove access"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Jobs */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Jobs ({jobs.length})</h2>
@@ -573,6 +1012,52 @@ export default function ClientsPage() {
             </div>
           </div>
         )}
+
+        {/* Grant Access Modal */}
+        {showGrantAccessModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Grant Access</h2>
+                <button onClick={() => { setShowGrantAccessModal(false); setSelectedRecruiterId('') }} className="p-1 hover:bg-gray-100 rounded">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Select a recruiter to grant them access to this client. They will be able to view the client, add activities, and add jobs.
+              </p>
+              <select
+                value={selectedRecruiterId}
+                onChange={(e) => setSelectedRecruiterId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent mb-4"
+              >
+                <option value="">Select a recruiter...</option>
+                {recruiters
+                  .filter(r => r.id !== currentUserId && !clientAccess.some(ca => ca.recruiter_id === r.id))
+                  .map((recruiter) => (
+                    <option key={recruiter.id} value={recruiter.id}>
+                      {recruiter.full_name || recruiter.email}
+                    </option>
+                  ))}
+              </select>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowGrantAccessModal(false); setSelectedRecruiterId('') }}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={grantAccess}
+                  disabled={!selectedRecruiterId}
+                  className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Grant Access
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -594,8 +1079,60 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 relative">
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab('mine')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'mine'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          My Clients
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'mine' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {myClientsCount}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('unclaimed')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'unclaimed'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Unclaimed
+          {unclaimedClientsCount > 0 && (
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+              activeTab === 'unclaimed' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-green-100 text-green-600'
+            }`}>
+              {unclaimedClientsCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'all'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          All Clients
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'all' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {clients.length}
+          </span>
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -639,64 +1176,121 @@ export default function ClientsPage() {
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Contact</th>
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Location</th>
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Status</th>
+                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Ownership</th>
                 <th className="w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredClients.map((client) => (
-                <tr 
-                  key={client.id} 
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => openDetailView(client)}
-                >
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{client.company_name}</div>
-                    {client.industry && <div className="text-sm text-gray-500">{client.industry}</div>}
-                  </td>
-                  <td className="px-6 py-4">
-                    {client.primary_contact_name && (
-                      <div className="text-gray-900">{client.primary_contact_name}</div>
-                    )}
-                    {client.primary_contact_email && (
-                      <div className="text-sm text-gray-500">{client.primary_contact_email}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {formatLocation(client.city, client.state, client.country) || '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[client.status]}`}>
-                      {client.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 relative" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setMenuOpen(menuOpen === client.id ? null : client.id)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <MoreVertical className="w-5 h-5 text-gray-400" />
-                    </button>
-                    {menuOpen === client.id && (
-                      <div className="absolute right-6 top-12 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
-                        <button
-                          onClick={() => openEditModal(client)}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <Pencil className="w-4 h-4" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(client.id)}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </button>
+              {filteredClients.map((client) => {
+                const ownershipStatus = getOwnershipStatus(client)
+                const isOwnedByOther = client.owned_by && client.owned_by !== currentUserId && ownershipStatus !== 'expired'
+                const colors = ownershipColors[ownershipStatus]
+                const OwnershipIcon = colors.icon
+
+                return (
+                  <tr 
+                    key={client.id} 
+                    className={`cursor-pointer transition-colors ${
+                      isOwnedByOther 
+                        ? 'bg-gray-50 opacity-60 hover:opacity-80' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                    onClick={() => openDetailView(client)}
+                  >
+                    <td className="px-6 py-4">
+                      <div className={`font-medium ${isOwnedByOther ? 'text-gray-500' : 'text-gray-900'}`}>
+                        {client.company_name}
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {client.industry && <div className="text-sm text-gray-500">{client.industry}</div>}
+                    </td>
+                    <td className="px-6 py-4">
+                      {client.primary_contact_name && (
+                        <div className={isOwnedByOther ? 'text-gray-500' : 'text-gray-900'}>
+                          {client.primary_contact_name}
+                        </div>
+                      )}
+                      {client.primary_contact_email && (
+                        <div className="text-sm text-gray-500">{client.primary_contact_email}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {formatLocation(client.city, client.state, client.country) || '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[client.status]}`}>
+                        {client.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
+                          <OwnershipIcon className="w-3 h-3" />
+                          {ownershipLabels[ownershipStatus]}
+                        </span>
+                        {client.owned_by && ownershipStatus !== 'expired' && client.owned_by !== currentUserId && (
+                          <span className="text-xs text-gray-500">
+                            {client.owner?.full_name || 'Another'}
+                          </span>
+                        )}
+                        {client.owned_by === currentUserId && ownershipStatus !== 'expired' && (
+                          <span className="text-xs text-gray-500">You</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 relative" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setMenuOpen(menuOpen === client.id ? null : client.id)}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <MoreVertical className="w-5 h-5 text-gray-400" />
+                      </button>
+                      {menuOpen === client.id && (
+                        <div className="absolute right-6 top-12 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
+                          {canClaim(client) && (
+                            <button
+                              onClick={() => { claimClient(client); setMenuOpen(null) }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-green hover:bg-gray-50"
+                            >
+                              <Lock className="w-4 h-4" />
+                              Claim
+                            </button>
+                          )}
+                          {isOwner(client) && (
+                            <>
+                              <button
+                                onClick={() => openEditModal(client)}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Pencil className="w-4 h-4" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => { releaseClient(client); setMenuOpen(null) }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-gray-50"
+                              >
+                                <Unlock className="w-4 h-4" />
+                                Release
+                              </button>
+                              <button
+                                onClick={() => handleDelete(client.id)}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Delete
+                              </button>
+                            </>
+                          )}
+                          {!isOwner(client) && !canClaim(client) && (
+                            <div className="px-4 py-2 text-sm text-gray-400">
+                              View only
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
