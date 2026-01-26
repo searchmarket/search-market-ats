@@ -100,7 +100,8 @@ export default function CandidatesPage() {
   const [generatingResume, setGeneratingResume] = useState(false)
   const [claimingCandidate, setClaimingCandidate] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [filterOwnership, setFilterOwnership] = useState<'all' | 'mine' | 'open'>('all')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [activeTab, setActiveTab] = useState<'mine' | 'new' | 'all'>('mine')
   const [uploadingFile, setUploadingFile] = useState(false)
   const [uploadingResume, setUploadingResume] = useState(false)
   const supabase = createClient()
@@ -172,6 +173,17 @@ export default function CandidatesPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setCurrentUserId(user.id)
+      
+      // Check if user is admin
+      const { data: recruiter } = await supabase
+        .from('recruiters')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
+      
+      if (recruiter?.is_admin) {
+        setIsAdmin(true)
+      }
     }
   }
 
@@ -913,16 +925,27 @@ export default function CandidatesPage() {
     
     if (!matchesSearch) return false
 
-    // Ownership filter
-    if (filterOwnership === 'mine') {
+    // Tab filter
+    if (activeTab === 'mine') {
       return candidate.owned_by === currentUserId
     }
-    if (filterOwnership === 'open') {
-      return !candidate.owned_by && (!candidate.exclusive_until || new Date(candidate.exclusive_until) <= new Date())
+    if (activeTab === 'new') {
+      // New candidates: added in last 7 days and not owned
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      return !candidate.owned_by && new Date(candidate.created_at) >= sevenDaysAgo
     }
     
     return true
   })
+
+  // Count for tabs
+  const myCandidatesCount = candidates.filter(c => c.owned_by === currentUserId).length
+  const newCandidatesCount = candidates.filter(c => {
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    return !c.owned_by && new Date(c.created_at) >= sevenDaysAgo
+  }).length
 
   const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-700',
@@ -1067,7 +1090,13 @@ export default function CandidatesPage() {
                   </button>
                   <button
                     onClick={() => setShowAddToJobModal(true)}
-                    className="flex items-center gap-2 px-3 py-2 bg-brand-green text-white rounded-lg hover:bg-green-700"
+                    disabled={!isOwner(selectedCandidate) && !isAdmin}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                      isOwner(selectedCandidate) || isAdmin
+                        ? 'bg-brand-green text-white hover:bg-green-700'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}
+                    title={!isOwner(selectedCandidate) && !isAdmin ? 'Only candidate owners or admins can add to jobs' : ''}
                   >
                     <UserPlus className="w-4 h-4" />
                     Add to Job
@@ -1811,12 +1840,12 @@ export default function CandidatesPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/pipeline"
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
             </svg>
-            Pipeline View
+            Pipeline
           </Link>
           <label className={`flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${parsingResume ? 'opacity-50 cursor-not-allowed' : ''}`}>
             {parsingResume ? (
@@ -1843,27 +1872,69 @@ export default function CandidatesPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab('mine')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'mine'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          My Candidates
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'mine' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {myCandidatesCount}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('new')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'new'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          New Candidates
+          {newCandidatesCount > 0 && (
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+              activeTab === 'new' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-orange-100 text-orange-600'
+            }`}>
+              {newCandidatesCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'all'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          All Candidates
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'all' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {candidates.length}
+          </span>
+        </button>
+      </div>
+
       {/* Search */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 relative">
+      <div className="mb-6">
+        <div className="relative max-w-md">
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search candidates by name, email, title, or skills..."
+            placeholder="Search candidates..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent"
           />
         </div>
-        <select
-          value={filterOwnership}
-          onChange={(e) => setFilterOwnership(e.target.value as 'all' | 'mine' | 'open')}
-          className="px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-        >
-          <option value="all">All Candidates</option>
-          <option value="mine">My Candidates</option>
-          <option value="open">Open Candidates</option>
-        </select>
       </div>
 
       {/* Content */}
