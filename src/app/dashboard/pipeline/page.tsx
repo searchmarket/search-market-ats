@@ -74,6 +74,9 @@ export default function PipelinePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setCurrentUserId(user.id)
+    } else {
+      // No user, stop loading
+      setLoading(false)
     }
   }
 
