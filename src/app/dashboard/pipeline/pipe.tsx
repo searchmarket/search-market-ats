@@ -56,17 +56,34 @@ export default function PipelinePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
-    fetchJobs()
-    fetchApplications()
+    getCurrentUser()
   }, [])
 
+  useEffect(() => {
+    if (currentUserId) {
+      fetchJobs()
+      fetchApplications()
+    }
+  }, [currentUserId])
+
+  async function getCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setCurrentUserId(user.id)
+    }
+  }
+
   async function fetchJobs() {
+    if (!currentUserId) return
+    
     const { data } = await supabase
       .from('jobs')
       .select('id, title, client:clients(company_name)')
+      .eq('recruiter_id', currentUserId)
       .eq('status', 'open')
       .order('created_at', { ascending: false })
 
@@ -76,6 +93,8 @@ export default function PipelinePage() {
   }
 
   async function fetchApplications() {
+    if (!currentUserId) return
+    
     const { data, error } = await supabase
       .from('applications')
       .select(`
@@ -83,6 +102,7 @@ export default function PipelinePage() {
         candidate:candidates(id, first_name, last_name, email, phone, current_title, current_company, city, state),
         job:jobs(id, title, client:clients(company_name))
       `)
+      .eq('recruiter_id', currentUserId)
       .not('stage', 'in', '("rejected","withdrawn")')
       .order('updated_at', { ascending: false })
 
