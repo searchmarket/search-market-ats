@@ -72,6 +72,7 @@ export default function JobsPage() {
   const [generatingJD, setGeneratingJD] = useState(false)
   const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -162,6 +163,17 @@ export default function JobsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setCurrentUserId(user.id)
+      
+      // Check if user is admin
+      const { data: recruiter } = await supabase
+        .from('recruiters')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single()
+      
+      if (recruiter?.is_admin) {
+        setIsAdmin(true)
+      }
     }
   }
 
@@ -451,24 +463,32 @@ export default function JobsPage() {
     if (job.status !== 'open') return false
     
     // Search filter
-    const matchesSearch = 
+    const matchesSearch = !searchQuery ||
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.clients?.company_name.toLowerCase().includes(searchQuery.toLowerCase())
+      job.clients?.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
     
     if (!matchesSearch) return false
     
-    // Tab filter
+    // Tab filter - wait for currentUserId to be loaded
+    if (!currentUserId) return true // Show all while loading
+    
     if (activeTab === 'mine') {
+      // My Jobs: only jobs I created
       return job.recruiter_id === currentUserId
     } else {
-      // Platform jobs - all open jobs from other recruiters
+      // Platform Jobs: all open jobs from OTHER recruiters
       return job.recruiter_id !== currentUserId
     }
   })
 
   // Counts for tabs
-  const myJobsCount = jobs.filter(j => j.status === 'open' && j.recruiter_id === currentUserId).length
-  const platformJobsCount = jobs.filter(j => j.status === 'open' && j.recruiter_id !== currentUserId).length
+  const myJobsCount = jobs.filter(j => 
+    j.status === 'open' && j.recruiter_id === currentUserId
+  ).length
+  
+  const platformJobsCount = jobs.filter(j => 
+    j.status === 'open' && j.recruiter_id !== currentUserId
+  ).length
 
   const statusColors: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700',

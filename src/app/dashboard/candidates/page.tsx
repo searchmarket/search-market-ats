@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces } from '@/lib/location-data'
@@ -9,7 +9,7 @@ import {
   Plus, Search, Users, MoreVertical, Pencil, Trash2, X, Mail, Phone, 
   MapPin, Briefcase, Linkedin, Github, Facebook, Instagram, ArrowLeft,
   FileText, UserPlus, Upload, Loader2, Clock, Lock, Unlock, MessageSquare,
-  PhoneCall, Calendar, User, AlertCircle, Download, File, Image, CreditCard, FolderOpen
+  PhoneCall, Calendar, User, AlertCircle, Download, File, Image, CreditCard, FolderOpen, FileCheck
 } from 'lucide-react'
 
 interface Job {
@@ -82,6 +82,7 @@ interface CandidateFile {
 
 export default function CandidatesPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [jobs, setJobs] = useState<Job[]>([])
   const [applications, setApplications] = useState<Application[]>([])
@@ -1174,6 +1175,13 @@ export default function CandidatesPage() {
                   >
                     <UserPlus className="w-4 h-4" />
                     Add to Job
+                  </button>
+                  <button
+                    onClick={() => router.push(`/dashboard/references?candidateId=${selectedCandidate.id}`)}
+                    className="flex items-center gap-2 px-3 py-2 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50"
+                  >
+                    <FileCheck className="w-4 h-4" />
+                    References
                   </button>
                 </div>
               </div>
