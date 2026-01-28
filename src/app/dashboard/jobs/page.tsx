@@ -1262,15 +1262,34 @@ export default function JobsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
                 <select
+                  required
                   value={formData.client_id}
-                  onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, client_id: e.target.value, hiring_manager_id: '' })}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                 >
                   <option value="">Select a client...</option>
                   {clients.map((client) => (
                     <option key={client.id} value={client.id}>{client.company_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hiring Manager *</label>
+                <select
+                  required
+                  value={formData.hiring_manager_id}
+                  onChange={(e) => setFormData({ ...formData, hiring_manager_id: e.target.value })}
+                  disabled={!formData.client_id}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">{formData.client_id ? (clientContacts.length === 0 ? 'No contacts - add in Clients page' : 'Select hiring manager...') : 'Select a client first...'}</option>
+                  {clientContacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contact.name}{contact.title ? ` - ${contact.title}` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
