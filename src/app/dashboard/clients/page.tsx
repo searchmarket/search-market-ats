@@ -108,7 +108,8 @@ export default function ClientsPage() {
     call_answered: false
   })
   const [clientContacts, setClientContacts] = useState<ClientContact[]>([])
-  const [showAddContactModal, setShowAddContactModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [editingContact, setEditingContact] = useState<ClientContact | null>(null)
   const [contactFormData, setContactFormData] = useState({
     name: '',
     title: '',
@@ -269,34 +270,86 @@ export default function ClientsPage() {
     }
   }
 
-  async function addClientContact() {
+  async function saveContact() {
     if (!selectedClient || !contactFormData.name) {
       alert('Name is required')
       return
     }
 
-    const { error } = await supabase
-      .from('client_contacts')
-      .insert([{
-        client_id: selectedClient.id,
-        name: contactFormData.name,
-        title: contactFormData.title || null,
-        email: contactFormData.email || null,
-        phone: contactFormData.phone || null,
-        notes: contactFormData.notes || null
-      }])
+    // Permission check: only owner or admin can add/edit
+    if (!isOwner(selectedClient) && !isAdmin) {
+      alert('Only the client owner or admins can manage contacts')
+      return
+    }
 
-    if (error) {
-      console.error('Error adding contact:', error)
-      alert('Error adding contact')
+    if (editingContact) {
+      // Update existing contact
+      const { error } = await supabase
+        .from('client_contacts')
+        .update({
+          name: contactFormData.name,
+          title: contactFormData.title || null,
+          email: contactFormData.email || null,
+          phone: contactFormData.phone || null,
+          notes: contactFormData.notes || null
+        })
+        .eq('id', editingContact.id)
+
+      if (error) {
+        console.error('Error updating contact:', error)
+        alert('Error updating contact')
+      } else {
+        resetContactForm()
+        fetchClientContacts(selectedClient.id)
+      }
     } else {
-      setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
-      setShowAddContactModal(false)
-      fetchClientContacts(selectedClient.id)
+      // Add new contact
+      const { error } = await supabase
+        .from('client_contacts')
+        .insert([{
+          client_id: selectedClient.id,
+          name: contactFormData.name,
+          title: contactFormData.title || null,
+          email: contactFormData.email || null,
+          phone: contactFormData.phone || null,
+          notes: contactFormData.notes || null
+        }])
+
+      if (error) {
+        console.error('Error adding contact:', error)
+        alert('Error adding contact')
+      } else {
+        resetContactForm()
+        fetchClientContacts(selectedClient.id)
+      }
     }
   }
 
+  function resetContactForm() {
+    setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
+    setEditingContact(null)
+    setShowContactModal(false)
+  }
+
+  function openEditContactModal(contact: ClientContact) {
+    setEditingContact(contact)
+    setContactFormData({
+      name: contact.name,
+      title: contact.title || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      notes: contact.notes || ''
+    })
+    setShowContactModal(true)
+  }
+
   async function deleteClientContact(contactId: string) {
+    // Only admins can delete contacts
+    if (!isAdmin) {
+      alert('Only admins can delete contacts')
+      return
+    }
+    
     if (!confirm('Are you sure you want to delete this contact?')) return
 
     const { error } = await supabase
@@ -310,6 +363,11 @@ export default function ClientsPage() {
     } else if (selectedClient) {
       fetchClientContacts(selectedClient.id)
     }
+  }
+
+  // Helper to check if user can manage contacts (add/edit)
+  function canManageContacts(client: Client): boolean {
+    return isOwner(client) || isAdmin
   }
 
   async function submitActivity() {
@@ -944,13 +1002,15 @@ export default function ClientsPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Contacts ({clientContacts.length})</h2>
-                <button
-                  onClick={() => setShowAddContactModal(true)}
-                  className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Contact
-                </button>
+                {canManageContacts(selectedClient) && (
+                  <button
+                    onClick={() => { resetContactForm(); setShowContactModal(true) }}
+                    className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Contact
+                  </button>
+                )}
               </div>
               {clientContacts.length === 0 ? (
                 <div className="text-center py-6 text-gray-400">
@@ -982,12 +1042,26 @@ export default function ClientsPage() {
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => deleteClientContact(contact.id)}
-                        className="p-1 text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {canManageContacts(selectedClient) && (
+                          <button
+                            onClick={() => openEditContactModal(contact)}
+                            className="p-1 text-gray-400 hover:text-brand-blue"
+                            title="Edit contact"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            onClick={() => deleteClientContact(contact.id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                            title="Delete contact"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1571,17 +1645,16 @@ export default function ClientsPage() {
           </div>
         )}
 
-        {/* Add Contact Modal - in Detail View */}
-        {showAddContactModal && (
+        {/* Contact Modal - in Detail View */}
+        {showContactModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
               <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-900">Add Contact</h2>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {editingContact ? 'Edit Contact' : 'Add Contact'}
+                </h2>
                 <button 
-                  onClick={() => {
-                    setShowAddContactModal(false)
-                    setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
-                  }}
+                  onClick={resetContactForm}
                   className="p-1 hover:bg-gray-100 rounded"
                 >
                   <X className="w-5 h-5 text-gray-500" />
@@ -1642,20 +1715,17 @@ export default function ClientsPage() {
               </div>
               <div className="p-6 border-t border-gray-100 flex gap-3">
                 <button
-                  onClick={() => {
-                    setShowAddContactModal(false)
-                    setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
-                  }}
+                  onClick={resetContactForm}
                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={addClientContact}
+                  onClick={saveContact}
                   disabled={!contactFormData.name}
                   className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
                 >
-                  Add Contact
+                  {editingContact ? 'Save Changes' : 'Add Contact'}
                 </button>
               </div>
             </div>

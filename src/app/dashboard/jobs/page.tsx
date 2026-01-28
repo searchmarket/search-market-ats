@@ -782,7 +782,7 @@ export default function JobsPage() {
             <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-6 border-b border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingJob ? 'Edit Job' : 'Post New Job'}
+                  {editingJob ? 'Edit Job' : 'Create Job'}
                 </h2>
                 <button onClick={() => { setShowModal(false); resetForm() }} className="p-1 hover:bg-gray-100 rounded">
                   <X className="w-5 h-5 text-gray-500" />
@@ -1052,7 +1052,7 @@ export default function JobsPage() {
           className="flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
         >
           <Plus className="w-5 h-5" />
-          Post New Job
+          Create Job
         </button>
       </div>
 
@@ -1146,7 +1146,7 @@ export default function JobsPage() {
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
             >
               <Plus className="w-5 h-5" />
-              Post Your First Job
+              Create Your First Job
             </button>
           )}
         </div>
@@ -1242,7 +1242,7 @@ export default function JobsPage() {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900">
-                {editingJob ? 'Edit Job' : 'Post New Job'}
+                {editingJob ? 'Edit Job' : 'Create Job'}
               </h2>
               <button onClick={() => { setShowModal(false); resetForm() }} className="p-1 hover:bg-gray-100 rounded">
                 <X className="w-5 h-5 text-gray-500" />
