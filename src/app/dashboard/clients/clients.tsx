@@ -9,7 +9,8 @@ import {
   Plus, Search, Building2, MoreVertical, Pencil, Trash2, X, 
   ArrowLeft, Mail, Phone, Globe, MapPin, Briefcase, Lock, Unlock, 
   Clock, FileText, UserPlus, Users, Loader2, Check, Calendar,
-  MessageSquare, PhoneCall, Linkedin, StickyNote, Send, FileSignature
+  MessageSquare, PhoneCall, Linkedin, StickyNote, Send, FileSignature,
+  CheckCircle
 } from 'lucide-react'
 
 interface Job {
@@ -1033,21 +1034,53 @@ export default function ClientsPage() {
               </div>
             )}
 
-            {/* Jobs */}
+            {/* Open Jobs */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Jobs ({jobs.length})</h2>
-              {jobs.length === 0 ? (
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-blue-600" />
+                Open Jobs ({jobs.filter(j => j.status === 'open' || j.status === 'on_hold' || j.status === 'draft').length})
+              </h2>
+              {jobs.filter(j => j.status === 'open' || j.status === 'on_hold' || j.status === 'draft').length === 0 ? (
                 <div className="text-center py-6 text-gray-400">
                   <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No jobs for this client</p>
+                  <p className="text-sm">No open jobs for this client</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {jobs.map((job) => (
+                  {jobs.filter(j => j.status === 'open' || j.status === 'on_hold' || j.status === 'draft').map((job) => (
                     <Link 
                       key={job.id} 
                       href={`/dashboard/jobs?id=${job.id}&fromClient=${selectedClient.id}`}
                       className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="font-medium text-gray-900 hover:text-brand-accent">{job.title}</div>
+                      <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${jobStatusColors[job.status]}`}>
+                        {job.status.replace('_', ' ')}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Closed Jobs */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                Closed Jobs ({jobs.filter(j => j.status === 'filled' || j.status === 'cancelled').length})
+              </h2>
+              {jobs.filter(j => j.status === 'filled' || j.status === 'cancelled').length === 0 ? (
+                <div className="text-center py-6 text-gray-400">
+                  <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No closed jobs with this client yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {jobs.filter(j => j.status === 'filled' || j.status === 'cancelled').map((job) => (
+                    <Link 
+                      key={job.id} 
+                      href={`/dashboard/jobs?id=${job.id}&fromClient=${selectedClient.id}`}
+                      className="block p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
                     >
                       <div className="font-medium text-gray-900 hover:text-brand-accent">{job.title}</div>
                       <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${jobStatusColors[job.status]}`}>
