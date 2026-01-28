@@ -70,7 +70,9 @@ export default function ReferencesPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   
   const [showCheckReference, setShowCheckReference] = useState(false)
+  const [showAddManualReference, setShowAddManualReference] = useState(false)
   const [questions, setQuestions] = useState<string[]>(DEFAULT_QUESTIONS)
+  const [manualAnswers, setManualAnswers] = useState<string[]>(DEFAULT_QUESTIONS.map(() => ''))
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null)
   const [editingQuestionText, setEditingQuestionText] = useState('')
   
@@ -223,6 +225,63 @@ export default function ReferencesPage() {
     }
     
     setSending(false)
+  }
+
+  async function saveManualReference() {
+    if (!candidate || !recruiter || !formData.reference_name) {
+      alert('Please fill in the reference name')
+      return
+    }
+    
+    setSending(true)
+    
+    const token = generateToken()
+    
+    // Format answers as array of {question, answer} objects
+    const formattedAnswers = questions.map((question, index) => ({
+      question,
+      answer: manualAnswers[index] || ''
+    }))
+    
+    // Create reference request with completed status
+    const { error } = await supabase
+      .from('reference_requests')
+      .insert({
+        candidate_id: candidate.id,
+        recruiter_id: recruiter.id,
+        reference_name: formData.reference_name,
+        reference_company: formData.reference_company || null,
+        reference_title: formData.reference_title || null,
+        reference_email: formData.reference_email || 'manual@entry.local',
+        reference_phone: formData.reference_phone || null,
+        token: token,
+        questions: questions,
+        answers: formattedAnswers,
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      })
+    
+    if (error) {
+      console.error('Error saving manual reference:', error)
+      alert('Error saving reference')
+      setSending(false)
+      return
+    }
+    
+    // Reset form
+    setFormData({
+      reference_name: '',
+      reference_company: '',
+      reference_title: '',
+      reference_email: '',
+      reference_phone: ''
+    })
+    setManualAnswers(questions.map(() => ''))
+    setShowAddManualReference(false)
+    fetchData()
+    setSending(false)
+    
+    alert('Reference added successfully!')
   }
 
   function generateToken(): string {
@@ -656,13 +715,22 @@ export default function ReferencesPage() {
             For {candidate.first_name} {candidate.last_name}
           </p>
         </div>
-        <button
-          onClick={() => setShowCheckReference(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Check Reference
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddManualReference(true)}
+            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Add Reference
+          </button>
+          <button
+            onClick={() => setShowCheckReference(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
+          >
+            <Send className="w-5 h-5" />
+            Check Reference
+          </button>
+        </div>
       </div>
 
       {/* Completed References */}
@@ -977,6 +1045,138 @@ export default function ReferencesPage() {
                   <Send className="w-5 h-5" />
                 )}
                 {sending ? 'Sending...' : 'Send Reference Form'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Manual Reference Modal */}
+      {showAddManualReference && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <h2 className="text-xl font-semibold text-gray-900">Add Reference Manually</h2>
+              <button 
+                onClick={() => setShowAddManualReference(false)} 
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Reference Contact Info */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Reference Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.reference_name}
+                      onChange={(e) => setFormData({ ...formData, reference_name: e.target.value })}
+                      placeholder="John Smith"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Building2 className="w-4 h-4 inline mr-1" />
+                      Company
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.reference_company}
+                      onChange={(e) => setFormData({ ...formData, reference_company: e.target.value })}
+                      placeholder="Acme Corp"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Briefcase className="w-4 h-4 inline mr-1" />
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.reference_title}
+                      onChange={(e) => setFormData({ ...formData, reference_title: e.target.value })}
+                      placeholder="VP of Engineering"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.reference_email}
+                      onChange={(e) => setFormData({ ...formData, reference_email: e.target.value })}
+                      placeholder="john@example.com"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Phone className="w-4 h-4 inline mr-1" />
+                      Cell
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.reference_phone}
+                      onChange={(e) => setFormData({ ...formData, reference_phone: e.target.value })}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Reference Answers */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Reference Answers</h3>
+                <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                  {questions.map((question, index) => (
+                    <div key={index}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <span className="text-brand-accent">{index + 1}.</span> {question}
+                      </label>
+                      <textarea
+                        value={manualAnswers[index]}
+                        onChange={(e) => {
+                          const newAnswers = [...manualAnswers]
+                          newAnswers[index] = e.target.value
+                          setManualAnswers(newAnswers)
+                        }}
+                        rows={2}
+                        placeholder="Enter response..."
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent text-sm resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 sticky bottom-0 bg-white">
+              <button
+                onClick={saveManualReference}
+                disabled={sending || !formData.reference_name}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Check className="w-5 h-5" />
+                )}
+                {sending ? 'Saving...' : 'Save Reference'}
               </button>
             </div>
           </div>

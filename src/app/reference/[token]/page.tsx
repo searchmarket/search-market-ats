@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { CheckCircle, Loader2, AlertCircle } from 'lucide-react'
 
@@ -14,6 +14,7 @@ interface ReferenceData {
 
 export default function PublicReferenceFormPage() {
   const params = useParams()
+  const router = useRouter()
   const token = params.token as string
   
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null)
@@ -55,9 +56,9 @@ export default function PublicReferenceFormPage() {
       
       const refData = data[0]
       
+      // Redirect to search.market if already completed
       if (refData.status === 'completed') {
-        setError('This reference has already been submitted. Thank you!')
-        setLoading(false)
+        window.location.href = 'https://search.market'
         return
       }
       
@@ -139,9 +140,7 @@ export default function PublicReferenceFormPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">
-            {error.includes('already been submitted') ? 'Already Submitted' : 'Link Not Valid'}
-          </h1>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Link Not Valid</h1>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
