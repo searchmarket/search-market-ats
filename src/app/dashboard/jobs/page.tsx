@@ -63,7 +63,7 @@ export default function JobsPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'mine' | 'platform'>('mine')
+  const [activeTab, setActiveTab] = useState<'platform' | 'mine' | 'closed'>('platform')
   const [showModal, setShowModal] = useState(false)
   const [showDetailView, setShowDetailView] = useState(false)
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
@@ -472,22 +472,30 @@ export default function JobsPage() {
     // Tab filter - wait for currentUserId to be loaded
     if (!currentUserId) return true // Show all while loading
     
-    if (activeTab === 'mine') {
-      // My Jobs: only jobs I created
-      return job.recruiter_id === currentUserId
-    } else {
+    if (activeTab === 'platform') {
       // Platform Jobs: all open jobs from OTHER recruiters
-      return job.recruiter_id !== currentUserId
+      return job.recruiter_id !== currentUserId && job.status === 'open'
+    } else if (activeTab === 'mine') {
+      // My Jobs: only open jobs I created
+      return job.recruiter_id === currentUserId && job.status === 'open'
+    } else if (activeTab === 'closed') {
+      // My Closed Jobs: filled or cancelled jobs I created
+      return job.recruiter_id === currentUserId && (job.status === 'filled' || job.status === 'cancelled')
     }
+    return true
   })
 
   // Counts for tabs
+  const platformJobsCount = jobs.filter(j => 
+    j.status === 'open' && j.recruiter_id !== currentUserId
+  ).length
+  
   const myJobsCount = jobs.filter(j => 
     j.status === 'open' && j.recruiter_id === currentUserId
   ).length
   
-  const platformJobsCount = jobs.filter(j => 
-    j.status === 'open' && j.recruiter_id !== currentUserId
+  const myClosedJobsCount = jobs.filter(j => 
+    (j.status === 'filled' || j.status === 'cancelled') && j.recruiter_id === currentUserId
   ).length
 
   const statusColors: Record<string, string> = {
@@ -968,6 +976,21 @@ export default function JobsPage() {
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
         <button
+          onClick={() => setActiveTab('platform')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'platform'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Platform Jobs
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'platform' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {platformJobsCount}
+          </span>
+        </button>
+        <button
           onClick={() => setActiveTab('mine')}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'mine'
@@ -983,18 +1006,18 @@ export default function JobsPage() {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('platform')}
+          onClick={() => setActiveTab('closed')}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'platform'
+            activeTab === 'closed'
               ? 'border-brand-accent text-brand-accent'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          Platform Jobs
+          My Closed Jobs
           <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-            activeTab === 'platform' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+            activeTab === 'closed' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
           }`}>
-            {platformJobsCount}
+            {myClosedJobsCount}
           </span>
         </button>
       </div>
@@ -1021,14 +1044,18 @@ export default function JobsPage() {
             <Briefcase className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {searchQuery ? 'No jobs found' : activeTab === 'mine' ? 'No open jobs' : 'No platform jobs'}
+            {searchQuery ? 'No jobs found' : 
+              activeTab === 'platform' ? 'No platform jobs' :
+              activeTab === 'mine' ? 'No open jobs' : 'No closed jobs'}
           </h3>
           <p className="text-gray-500 mb-6 max-w-md mx-auto">
             {searchQuery 
               ? 'Try a different search term' 
-              : activeTab === 'mine' 
-                ? 'Post a new job to start tracking candidates and placements.'
-                : 'No open jobs from other recruiters at this time.'}
+              : activeTab === 'platform'
+                ? 'No open jobs from other recruiters at this time.'
+                : activeTab === 'mine' 
+                  ? 'Post a new job to start tracking candidates and placements.'
+                  : 'You have no closed or filled jobs yet.'}
           </p>
           {!searchQuery && activeTab === 'mine' && (
             <button
