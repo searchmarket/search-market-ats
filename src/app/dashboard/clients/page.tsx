@@ -705,7 +705,6 @@ export default function ClientsPage() {
     // Search filter
     const matchesSearch = 
       client.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.primary_contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.industry?.toLowerCase().includes(searchQuery.toLowerCase())
     
     if (!matchesSearch) return false
@@ -940,34 +939,6 @@ export default function ClientsPage() {
                 )}
               </div>
             </div>
-
-            {/* Primary Contact */}
-            {(selectedClient.primary_contact_name || selectedClient.primary_contact_email || selectedClient.primary_contact_phone) && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Primary Contact</h2>
-                <div className="space-y-3">
-                  {selectedClient.primary_contact_name && (
-                    <div className="text-gray-900 font-medium">{selectedClient.primary_contact_name}</div>
-                  )}
-                  <div className="flex flex-wrap gap-4">
-                    {selectedClient.primary_contact_email && (
-                      <a href={`mailto:${selectedClient.primary_contact_email}`} 
-                        className="flex items-center gap-2 text-gray-600 hover:text-brand-blue">
-                        <Mail className="w-4 h-4" />
-                        {selectedClient.primary_contact_email}
-                      </a>
-                    )}
-                    {selectedClient.primary_contact_phone && (
-                      <a href={`tel:${selectedClient.primary_contact_phone}`}
-                        className="flex items-center gap-2 text-gray-600 hover:text-brand-blue">
-                        <Phone className="w-4 h-4" />
-                        {selectedClient.primary_contact_phone}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Client Contacts (Employees) */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -1340,35 +1311,6 @@ export default function ClientsPage() {
                   </div>
                 </div>
                 <hr className="my-4" />
-                <h3 className="font-medium text-gray-900">Primary Contact</h3>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
-                  <input
-                    type="text"
-                    value={formData.primary_contact_name}
-                    onChange={(e) => setFormData({ ...formData, primary_contact_name: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
-                  <input
-                    type="email"
-                    value={formData.primary_contact_email}
-                    onChange={(e) => setFormData({ ...formData, primary_contact_email: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.primary_contact_phone}
-                    onChange={(e) => setFormData({ ...formData, primary_contact_phone: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <hr className="my-4" />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                   <textarea
@@ -1628,6 +1570,97 @@ export default function ClientsPage() {
             </div>
           </div>
         )}
+
+        {/* Add Contact Modal - in Detail View */}
+        {showAddContactModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900">Add Contact</h2>
+                <button 
+                  onClick={() => {
+                    setShowAddContactModal(false)
+                    setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={contactFormData.name}
+                    onChange={(e) => setContactFormData({ ...contactFormData, name: e.target.value })}
+                    placeholder="John Smith"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={contactFormData.title}
+                    onChange={(e) => setContactFormData({ ...contactFormData, title: e.target.value })}
+                    placeholder="VP of Engineering"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={contactFormData.email}
+                    onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                    placeholder="john@company.com"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={contactFormData.phone}
+                    onChange={(e) => setContactFormData({ ...contactFormData, phone: e.target.value })}
+                    placeholder="+1 (555) 123-4567"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={contactFormData.notes}
+                    onChange={(e) => setContactFormData({ ...contactFormData, notes: e.target.value })}
+                    placeholder="Additional notes..."
+                    rows={2}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent resize-none"
+                  />
+                </div>
+              </div>
+              <div className="p-6 border-t border-gray-100 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddContactModal(false)
+                    setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addClientContact}
+                  disabled={!contactFormData.name}
+                  className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
+                >
+                  Add Contact
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -1743,7 +1776,6 @@ export default function ClientsPage() {
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Company</th>
-                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Contact</th>
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Location</th>
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Status</th>
                 <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Ownership</th>
@@ -1772,16 +1804,6 @@ export default function ClientsPage() {
                         {client.company_name}
                       </div>
                       {client.industry && <div className="text-sm text-gray-500">{client.industry}</div>}
-                    </td>
-                    <td className="px-6 py-4">
-                      {client.primary_contact_name && (
-                        <div className={isOwnedByOther ? 'text-gray-500' : 'text-gray-900'}>
-                          {client.primary_contact_name}
-                        </div>
-                      )}
-                      {client.primary_contact_email && (
-                        <div className="text-sm text-gray-500">{client.primary_contact_email}</div>
-                      )}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
                       {formatLocation(client.city, client.state, client.country) || '-'}
@@ -1953,35 +1975,6 @@ export default function ClientsPage() {
                 </div>
               </div>
               <hr className="my-4" />
-              <h3 className="font-medium text-gray-900">Primary Contact</h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
-                <input
-                  type="text"
-                  value={formData.primary_contact_name}
-                  onChange={(e) => setFormData({ ...formData, primary_contact_name: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
-                <input
-                  type="email"
-                  value={formData.primary_contact_email}
-                  onChange={(e) => setFormData({ ...formData, primary_contact_email: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
-                <input
-                  type="tel"
-                  value={formData.primary_contact_phone}
-                  onChange={(e) => setFormData({ ...formData, primary_contact_phone: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <hr className="my-4" />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
@@ -2019,97 +2012,6 @@ export default function ClientsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add Contact Modal */}
-      {showAddContactModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-xl font-semibold text-gray-900">Add Contact</h2>
-              <button 
-                onClick={() => {
-                  setShowAddContactModal(false)
-                  setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
-                }}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={contactFormData.name}
-                  onChange={(e) => setContactFormData({ ...contactFormData, name: e.target.value })}
-                  placeholder="John Smith"
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={contactFormData.title}
-                  onChange={(e) => setContactFormData({ ...contactFormData, title: e.target.value })}
-                  placeholder="VP of Engineering"
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={contactFormData.email}
-                  onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
-                  placeholder="john@company.com"
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={contactFormData.phone}
-                  onChange={(e) => setContactFormData({ ...contactFormData, phone: e.target.value })}
-                  placeholder="+1 (555) 123-4567"
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea
-                  value={contactFormData.notes}
-                  onChange={(e) => setContactFormData({ ...contactFormData, notes: e.target.value })}
-                  placeholder="Additional notes..."
-                  rows={2}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent resize-none"
-                />
-              </div>
-            </div>
-            <div className="p-6 border-t border-gray-100 flex gap-3">
-              <button
-                onClick={() => {
-                  setShowAddContactModal(false)
-                  setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
-                }}
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addClientContact}
-                disabled={!contactFormData.name}
-                className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
-              >
-                Add Contact
-              </button>
-            </div>
           </div>
         </div>
       )}

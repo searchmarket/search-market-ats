@@ -183,20 +183,16 @@ export default function JobsPage() {
   }
 
   async function fetchClientContacts(clientId: string) {
-    console.log('Fetching contacts for client:', clientId)
     const { data, error } = await supabase
       .from('client_contacts')
       .select('id, client_id, name, title, email, phone')
       .eq('client_id', clientId)
       .order('name')
 
-    console.log('Client contacts result:', { data, error })
-    
     if (error) {
       console.error('Error fetching client contacts:', error)
       setClientContacts([])
     } else {
-      console.log('Setting clientContacts to:', data)
       setClientContacts((data as unknown as ClientContact[]) || [])
     }
   }
@@ -806,7 +802,7 @@ export default function JobsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client * <span className="text-xs text-gray-400">(id: {formData.client_id || 'none'})</span></label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
                   <select
                     required
                     value={formData.client_id}
@@ -821,7 +817,7 @@ export default function JobsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Hiring Manager * <span className="text-xs text-gray-400">(contacts: {clientContacts.length})</span></label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hiring Manager *</label>
                   <select
                     required
                     value={formData.hiring_manager_id}
