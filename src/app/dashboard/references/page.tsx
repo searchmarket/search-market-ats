@@ -276,7 +276,10 @@ export default function ReferencesPage() {
       reference_email: '',
       reference_phone: ''
     })
-    setManualAnswers(questions.map(() => ''))
+    setQuestions(DEFAULT_QUESTIONS)
+    setManualAnswers(DEFAULT_QUESTIONS.map(() => ''))
+    setEditingQuestionIndex(null)
+    setEditingQuestionText('')
     setShowAddManualReference(false)
     fetchData()
     setSending(false)
@@ -1058,7 +1061,11 @@ export default function ReferencesPage() {
             <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
               <h2 className="text-xl font-semibold text-gray-900">Add Reference Manually</h2>
               <button 
-                onClick={() => setShowAddManualReference(false)} 
+                onClick={() => {
+                  setShowAddManualReference(false)
+                  setEditingQuestionIndex(null)
+                  setEditingQuestionText('')
+                }} 
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 <X className="w-5 h-5 text-gray-500" />
@@ -1139,26 +1146,78 @@ export default function ReferencesPage() {
                 </div>
               </div>
 
-              {/* Reference Answers */}
+              {/* Reference Questions & Answers */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Reference Answers</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Reference Questions & Answers</h3>
+                <p className="text-sm text-gray-500 mb-3">Click on any question to edit it</p>
                 <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
                   {questions.map((question, index) => (
-                    <div key={index}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        <span className="text-brand-accent">{index + 1}.</span> {question}
-                      </label>
-                      <textarea
-                        value={manualAnswers[index]}
-                        onChange={(e) => {
-                          const newAnswers = [...manualAnswers]
-                          newAnswers[index] = e.target.value
-                          setManualAnswers(newAnswers)
-                        }}
-                        rows={2}
-                        placeholder="Enter response..."
-                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent text-sm resize-none"
-                      />
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm font-medium text-brand-accent w-6 pt-1 flex-shrink-0">
+                          {index + 1}.
+                        </span>
+                        {editingQuestionIndex === index ? (
+                          <div className="flex-1 space-y-2">
+                            <textarea
+                              value={editingQuestionText}
+                              onChange={(e) => setEditingQuestionText(e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-brand-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent resize-none"
+                              rows={2}
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  const newQuestions = [...questions]
+                                  newQuestions[index] = editingQuestionText
+                                  setQuestions(newQuestions)
+                                  setEditingQuestionIndex(null)
+                                  setEditingQuestionText('')
+                                }}
+                                className="px-3 py-1 bg-brand-accent text-white text-sm rounded-lg hover:bg-brand-blue"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingQuestionIndex(null)
+                                  setEditingQuestionText('')
+                                }}
+                                className="px-3 py-1 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => {
+                              setEditingQuestionIndex(index)
+                              setEditingQuestionText(question)
+                            }}
+                            className="flex-1 flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer group"
+                          >
+                            <span className="text-sm text-gray-700">{question}</span>
+                            <Pencil className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0 ml-2" />
+                          </div>
+                        )}
+                      </div>
+                      {editingQuestionIndex !== index && (
+                        <div className="ml-8">
+                          <textarea
+                            value={manualAnswers[index]}
+                            onChange={(e) => {
+                              const newAnswers = [...manualAnswers]
+                              newAnswers[index] = e.target.value
+                              setManualAnswers(newAnswers)
+                            }}
+                            rows={2}
+                            placeholder="Enter response..."
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent text-sm resize-none"
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
