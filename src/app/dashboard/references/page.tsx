@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { 
   ArrowLeft, Plus, Send, FileText, Check, Clock, 
   User, Building2, Briefcase, Mail, Phone, Pencil,
-  Printer, ChevronDown, ChevronUp, Loader2, X, Copy, ExternalLink
+  Printer, ChevronDown, ChevronUp, Loader2, X, Copy, ExternalLink, Trash2
 } from 'lucide-react'
 
 interface Candidate {
@@ -21,6 +21,7 @@ interface Recruiter {
   id: string
   full_name: string | null
   email: string
+  is_admin?: boolean
 }
 
 interface ReferenceRequest {
@@ -63,6 +64,7 @@ export default function ReferencesPage() {
   const [references, setReferences] = useState<ReferenceRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   const [showCheckReference, setShowCheckReference] = useState(false)
   const [questions, setQuestions] = useState<string[]>(DEFAULT_QUESTIONS)
@@ -95,12 +97,13 @@ export default function ReferencesPage() {
     if (user) {
       const { data: recruiterData } = await supabase
         .from('recruiters')
-        .select('id, full_name, email')
+        .select('id, full_name, email, is_admin')
         .eq('id', user.id)
         .single()
       
       if (recruiterData) {
         setRecruiter(recruiterData)
+        setIsAdmin(recruiterData.is_admin || false)
       }
     }
     
@@ -127,6 +130,35 @@ export default function ReferencesPage() {
     }
     
     setLoading(false)
+  }
+  
+  async function deleteReference(ref: ReferenceRequest) {
+    // Completed references can only be deleted by admins
+    if (ref.status === 'completed' && !isAdmin) {
+      alert('Only admins can delete submitted references')
+      return
+    }
+    
+    const confirmMsg = ref.status === 'completed' 
+      ? 'Are you sure you want to delete this submitted reference? This cannot be undone.'
+      : 'Are you sure you want to delete this pending reference request?'
+    
+    if (!confirm(confirmMsg)) return
+    
+    const { error } = await supabase
+      .from('reference_requests')
+      .delete()
+      .eq('id', ref.id)
+    
+    if (error) {
+      console.error('Error deleting reference:', error)
+      alert('Error deleting reference')
+    } else {
+      fetchData()
+      if (selectedReference?.id === ref.id) {
+        setSelectedReference(null)
+      }
+    }
   }
 
   function generateToken(): string {
@@ -416,13 +448,24 @@ export default function ReferencesPage() {
               <h1 className="text-2xl font-bold text-gray-900">Reference Check</h1>
               <p className="text-gray-500">For {candidate.first_name} {candidate.last_name}</p>
             </div>
-            <button
-              onClick={() => printReference(selectedReference)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => printReference(selectedReference)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => deleteReference(selectedReference)}
+                  className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="p-6">
@@ -560,6 +603,15 @@ export default function ReferencesPage() {
                   >
                     <Printer className="w-4 h-4" />
                   </button>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteReference(ref) }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                      title="Delete (Admin only)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -601,6 +653,13 @@ export default function ReferencesPage() {
                     title="Copy Link"
                   >
                     <Copy className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => deleteReference(ref)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
