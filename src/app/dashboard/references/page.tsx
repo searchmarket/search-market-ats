@@ -176,27 +176,22 @@ export default function ReferencesPage() {
     
     // Try to send email via API
     try {
-      const emailBody = `Hi,
-
-My name is ${recruiter.full_name || 'A recruiter'} and I'm a recruiter working with Search Market, a new AI powered talent finding platform. I was given your information as a reference for ${candidate.first_name} ${candidate.last_name}. I am wondering if you could take a moment to visit the following page and fill in the reference information.
-
-${referenceUrl}
-
-Thanks very much in advance!
-
-Craig Ferguson
-https://Search.Market
-craig.ferguson@search.market`
-
-      await fetch('/api/send-email', {
+      const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: formData.reference_email,
-          subject: `Reference Check for ${candidate.first_name} ${candidate.last_name}`,
-          body: emailBody
+          referenceName: formData.reference_name,
+          candidateName: `${candidate.first_name} ${candidate.last_name}`,
+          recruiterName: recruiter.full_name || 'A recruiter',
+          referenceUrl: referenceUrl
         })
       })
+      
+      const result = await response.json()
+      if (!result.success) {
+        console.warn('Email not sent:', result.error)
+      }
     } catch (err) {
       console.warn('Email API not available')
     }
