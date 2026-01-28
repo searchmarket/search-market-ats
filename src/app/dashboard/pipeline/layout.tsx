@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Pipeline | ATS | Search.Market',
+  title: 'Smart Pipeline | ATS | Search.Market',
 }
 
 export default function PipelineLayout({

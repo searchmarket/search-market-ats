@@ -209,7 +209,7 @@ export default function PipelinePage() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Candidate Pipeline</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Smart Pipeline</h1>
               <p className="text-gray-500 text-sm">Drag candidates between stages to update their status</p>
             </div>
           </div>
