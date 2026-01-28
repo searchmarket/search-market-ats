@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Use Resend's test domain until your domain is verified
     // Change to 'Search.Market <noreply@search.market>' after domain verification
-    const fromAddress = 'Search.Market <onboarding@resend.dev>'
+    const fromAddress = 'Search.Market <noreply@search.market>'
 
     console.log('Sending email to:', to)
     console.log('From:', fromAddress)
