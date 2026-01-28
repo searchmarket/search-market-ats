@@ -11,7 +11,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Home
+  Home,
+  Megaphone
 } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
@@ -22,6 +23,7 @@ const navItems: { label: string; href: string; icon: any; external?: boolean }[]
   { label: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
+  { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
   { label: 'Hub', href: 'https://hub.search.market', icon: Home, external: true },
 ]
 
