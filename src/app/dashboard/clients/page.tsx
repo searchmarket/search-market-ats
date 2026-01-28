@@ -5,18 +5,20 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces, industries } from '@/lib/location-data'
+import RichTextEditor from '@/components/RichTextEditor'
 import { 
   Plus, Search, Building2, MoreVertical, Pencil, Trash2, X, 
   ArrowLeft, Mail, Phone, Globe, MapPin, Briefcase, Lock, Unlock, 
   Clock, FileText, UserPlus, Users, Loader2, Check, Calendar,
   MessageSquare, PhoneCall, Linkedin, StickyNote, Send, FileSignature,
-  CheckCircle
+  CheckCircle, Sparkles, RefreshCw
 } from 'lucide-react'
 
 interface Job {
   id: string
   title: string
   status: string
+  hiring_manager_id?: string | null
 }
 
 interface Recruiter {
@@ -116,6 +118,26 @@ export default function ClientsPage() {
     email: '',
     phone: '',
     notes: ''
+  })
+  const [showCreateJobModal, setShowCreateJobModal] = useState(false)
+  const [creatingJob, setCreatingJob] = useState(false)
+  const [generatingJD, setGeneratingJD] = useState(false)
+  const [rewritingJD, setRewritingJD] = useState(false)
+  const [jobFormData, setJobFormData] = useState({
+    title: '',
+    hiring_manager_id: '',
+    description: '',
+    requirements: '',
+    city: '',
+    state: '',
+    country: 'CA',
+    location_type: 'onsite',
+    employment_type: 'permanent',
+    salary_min: '',
+    salary_max: '',
+    salary_currency: 'CAD',
+    fee_percent: '',
+    status: 'open'
   })
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -368,6 +390,57 @@ export default function ClientsPage() {
   // Helper to check if user can manage contacts (add/edit)
   function canManageContacts(client: Client): boolean {
     return isOwner(client) || isAdmin
+  }
+
+  async function createJob() {
+    if (!selectedClient || !currentUserId) return
+    
+    if (!jobFormData.title) {
+      alert('Job title is required')
+      return
+    }
+    
+    if (!jobFormData.hiring_manager_id) {
+      alert('Please select a hiring manager')
+      return
+    }
+    
+    if (!jobFormData.salary_min || !jobFormData.salary_max) {
+      alert('Salary range (min and max) is required')
+      return
+    }
+    
+    setCreatingJob(true)
+    
+    const { error } = await supabase.from('jobs').insert([{
+      title: jobFormData.title,
+      client_id: selectedClient.id,
+      hiring_manager_id: jobFormData.hiring_manager_id,
+      description: jobFormData.description || null,
+      requirements: jobFormData.requirements || null,
+      city: jobFormData.city || null,
+      state: jobFormData.state || null,
+      country: jobFormData.country,
+      location_type: jobFormData.location_type,
+      employment_type: jobFormData.employment_type,
+      salary_min: parseFloat(jobFormData.salary_min),
+      salary_max: parseFloat(jobFormData.salary_max),
+      salary_currency: jobFormData.salary_currency,
+      fee_percent: jobFormData.fee_percent ? parseFloat(jobFormData.fee_percent) : null,
+      status: jobFormData.status,
+      recruiter_id: currentUserId,
+      is_published: false
+    }])
+    
+    setCreatingJob(false)
+    
+    if (error) {
+      console.error('Error creating job:', error)
+      alert('Error creating job')
+    } else {
+      setShowCreateJobModal(false)
+      fetchJobsForClient(selectedClient.id)
+    }
   }
 
   async function submitActivity() {
@@ -1213,10 +1286,39 @@ export default function ClientsPage() {
 
             {/* Open Jobs */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-blue-600" />
-                Open Jobs ({jobs.filter(j => j.status === 'open' || j.status === 'on_hold' || j.status === 'draft').length})
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-blue-600" />
+                  Open Jobs ({jobs.filter(j => j.status === 'open' || j.status === 'on_hold' || j.status === 'draft').length})
+                </h2>
+                {canManageContacts(selectedClient) && (
+                  <button
+                    onClick={() => {
+                      setJobFormData({
+                        title: '',
+                        hiring_manager_id: '',
+                        description: '',
+                        requirements: '',
+                        city: '',
+                        state: '',
+                        country: 'CA',
+                        location_type: 'onsite',
+                        employment_type: 'permanent',
+                        salary_min: '',
+                        salary_max: '',
+                        salary_currency: 'CAD',
+                        fee_percent: '',
+                        status: 'open'
+                      })
+                      setShowCreateJobModal(true)
+                    }}
+                    className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Job
+                  </button>
+                )}
+              </div>
               {jobs.filter(j => j.status === 'open' || j.status === 'on_hold' || j.status === 'draft').length === 0 ? (
                 <div className="text-center py-6 text-gray-400">
                   <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -1726,6 +1828,203 @@ export default function ClientsPage() {
                   className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
                 >
                   {editingContact ? 'Save Changes' : 'Add Contact'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Job Modal */}
+        {showCreateJobModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900">Create Job for {selectedClient.company_name}</h2>
+                <button 
+                  onClick={() => setShowCreateJobModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={jobFormData.title}
+                    onChange={(e) => setJobFormData({ ...jobFormData, title: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="e.g. Senior Software Engineer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hiring Manager *</label>
+                  <select
+                    required
+                    value={jobFormData.hiring_manager_id}
+                    onChange={(e) => setJobFormData({ ...jobFormData, hiring_manager_id: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="">{clientContacts.length === 0 ? 'No contacts - add one first' : 'Select hiring manager...'}</option>
+                    {clientContacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name}{contact.title ? ` - ${contact.title}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={jobFormData.description}
+                    onChange={(e) => setJobFormData({ ...jobFormData, description: e.target.value })}
+                    rows={4}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="Job description, responsibilities..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Requirements</label>
+                  <textarea
+                    value={jobFormData.requirements}
+                    onChange={(e) => setJobFormData({ ...jobFormData, requirements: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="Required skills, experience..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={jobFormData.city}
+                      onChange={(e) => setJobFormData({ ...jobFormData, city: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Province/State</label>
+                    <select
+                      value={jobFormData.state}
+                      onChange={(e) => setJobFormData({ ...jobFormData, state: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="">Select...</option>
+                      {(provinces[jobFormData.country] || []).map((p: {code: string, name: string}) => (
+                        <option key={p.code} value={p.code}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <select
+                      value={jobFormData.country}
+                      onChange={(e) => setJobFormData({ ...jobFormData, country: e.target.value, state: '', salary_currency: e.target.value === 'CA' ? 'CAD' : 'USD' })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      {countries.map((c) => (
+                        <option key={c.code} value={c.code}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location Type</label>
+                    <select
+                      value={jobFormData.location_type}
+                      onChange={(e) => setJobFormData({ ...jobFormData, location_type: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="onsite">On-site</option>
+                      <option value="remote">Remote</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Salary *</label>
+                    <input
+                      type="number"
+                      required
+                      value={jobFormData.salary_min}
+                      onChange={(e) => setJobFormData({ ...jobFormData, salary_min: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="80000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Salary *</label>
+                    <input
+                      type="number"
+                      required
+                      value={jobFormData.salary_max}
+                      onChange={(e) => setJobFormData({ ...jobFormData, salary_max: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="120000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <select
+                      value={jobFormData.salary_currency}
+                      onChange={(e) => setJobFormData({ ...jobFormData, salary_currency: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="CAD">CAD</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employment Type</label>
+                    <select
+                      value={jobFormData.employment_type}
+                      onChange={(e) => setJobFormData({ ...jobFormData, employment_type: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="permanent">Permanent</option>
+                      <option value="contract">Contract</option>
+                      <option value="contract_to_hire">Contract to Hire</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fee %</label>
+                    <input
+                      type="number"
+                      value={jobFormData.fee_percent}
+                      onChange={(e) => setJobFormData({ ...jobFormData, fee_percent: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="20"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 border-t border-gray-100 flex gap-3">
+                <button
+                  onClick={() => setShowCreateJobModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createJob}
+                  disabled={creatingJob || !jobFormData.title || !jobFormData.hiring_manager_id || !jobFormData.salary_min || !jobFormData.salary_max}
+                  className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
+                >
+                  {creatingJob ? 'Creating...' : 'Create Job'}
                 </button>
               </div>
             </div>
