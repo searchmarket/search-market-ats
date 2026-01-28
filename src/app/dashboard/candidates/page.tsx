@@ -172,6 +172,7 @@ export default function CandidatesPage() {
 
   async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser()
+    console.log('Current user:', user?.id)
     if (user) {
       setCurrentUserId(user.id)
       
@@ -197,6 +198,7 @@ export default function CandidatesPage() {
     if (error) {
       console.error('Error fetching candidates:', error)
     } else {
+      console.log('Fetched candidates:', data?.length, 'Owned candidates:', data?.filter(c => c.owned_by).length)
       setCandidates((data as unknown as Candidate[]) || [])
     }
     setLoading(false)
@@ -997,6 +999,15 @@ export default function CandidatesPage() {
     setGeneratingResume(false)
   }
 
+  // Debug: log counts whenever they change
+  useEffect(() => {
+    if (currentUserId && candidates.length > 0) {
+      console.log('DEBUG - currentUserId:', currentUserId)
+      console.log('DEBUG - candidates with owned_by:', candidates.filter(c => c.owned_by).map(c => ({ id: c.id, name: c.first_name, owned_by: c.owned_by })))
+      console.log('DEBUG - my candidates:', candidates.filter(c => c.owned_by === currentUserId).length)
+    }
+  }, [currentUserId, candidates])
+
   const filteredCandidates = candidates.filter(candidate => {
     const matchesSearch = 
       `${candidate.first_name} ${candidate.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1006,7 +1017,9 @@ export default function CandidatesPage() {
     
     if (!matchesSearch) return false
 
-    // Tab filter
+    // Tab filter - wait for currentUserId to be loaded
+    if (!currentUserId) return true // Show all while loading user
+    
     if (activeTab === 'mine') {
       return candidate.owned_by === currentUserId
     }
@@ -1018,8 +1031,10 @@ export default function CandidatesPage() {
     return true
   })
 
-  // Count for tabs
-  const myCandidatesCount = candidates.filter(c => c.owned_by === currentUserId).length
+  // Count for tabs - only count when currentUserId is loaded
+  const myCandidatesCount = currentUserId 
+    ? candidates.filter(c => c.owned_by === currentUserId).length 
+    : 0
   const unclaimedCandidatesCount = candidates.filter(c => !c.owned_by).length
 
   const statusColors: Record<string, string> = {
