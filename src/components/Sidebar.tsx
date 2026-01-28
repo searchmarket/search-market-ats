@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
-  LayoutDashboard,
   Briefcase, 
   Users, 
   Building2,
@@ -12,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
-  Megaphone,
   Workflow
 } from 'lucide-react'
 import { useState } from 'react'
@@ -20,12 +18,10 @@ import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 
 const navItems: { label: string; href: string; icon: any; external?: boolean }[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Smart Pipeline', href: '/dashboard/pipeline', icon: Workflow },
-  { label: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
-  { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
+  { label: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
+  { label: 'Smart Pipeline', href: '/dashboard/pipeline', icon: Workflow },
   { label: 'Hub', href: 'https://hub.search.market', icon: Home, external: true },
 ]
 
