@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase-browser'
 import { 
   ArrowLeft, Plus, Send, FileText, Check, Clock, 
   User, Building2, Briefcase, Mail, Phone, Pencil,
-  Printer, ChevronDown, ChevronUp, Loader2, X, Copy, ExternalLink, Trash2
+  Printer, ChevronDown, ChevronUp, Loader2, X, Copy, ExternalLink, Trash2,
+  RotateCcw, AlertCircle
 } from 'lucide-react'
 
 interface Candidate {
@@ -36,9 +37,11 @@ interface ReferenceRequest {
   reference_phone: string | null
   questions: string[]
   answers: { question: string; answer: string }[] | null
-  status: 'pending' | 'completed'
+  status: 'pending' | 'completed' | 'no_response'
   created_at: string
   completed_at: string | null
+  reminder_sent_at: string | null
+  last_sent_at: string | null
 }
 
 const DEFAULT_QUESTIONS = [
@@ -132,16 +135,29 @@ export default function ReferencesPage() {
     setLoading(false)
   }
   
+  // Check if current user can manage (edit/delete) a reference
+  function canManageReference(ref: ReferenceRequest): boolean {
+    // Completed references: admin only
+    if (ref.status === 'completed') {
+      return isAdmin
+    }
+    // Pending or no_response: admin or creator
+    return isAdmin || ref.recruiter_id === recruiter?.id
+  }
+  
   async function deleteReference(ref: ReferenceRequest) {
-    // Completed references can only be deleted by admins
-    if (ref.status === 'completed' && !isAdmin) {
-      alert('Only admins can delete submitted references')
+    if (!canManageReference(ref)) {
+      if (ref.status === 'completed') {
+        alert('Only admins can delete submitted references')
+      } else {
+        alert('Only the recruiter who created this reference or an admin can delete it')
+      }
       return
     }
     
     const confirmMsg = ref.status === 'completed' 
       ? 'Are you sure you want to delete this submitted reference? This cannot be undone.'
-      : 'Are you sure you want to delete this pending reference request?'
+      : 'Are you sure you want to delete this reference request?'
     
     if (!confirm(confirmMsg)) return
     
@@ -159,6 +175,54 @@ export default function ReferencesPage() {
         setSelectedReference(null)
       }
     }
+  }
+  
+  async function resendReferenceEmail(ref: ReferenceRequest) {
+    if (!canManageReference(ref)) {
+      alert('Only the recruiter who created this reference or an admin can resend it')
+      return
+    }
+    
+    if (!candidate || !recruiter) return
+    
+    setSending(true)
+    
+    const referenceUrl = `${window.location.origin}/reference/${ref.token}`
+    
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: ref.reference_email,
+          referenceName: ref.reference_name,
+          candidateName: `${candidate.first_name} ${candidate.last_name}`,
+          recruiterName: recruiter.full_name || 'A recruiter',
+          referenceUrl: referenceUrl,
+          isReminder: true
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success && result.messageId) {
+        // Update last_sent_at in database
+        await supabase
+          .from('reference_requests')
+          .update({ last_sent_at: new Date().toISOString() })
+          .eq('id', ref.id)
+        
+        alert('Reference request resent successfully!')
+        fetchData()
+      } else {
+        alert(`Failed to resend: ${result.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      console.error('Error resending:', err)
+      alert('Error resending reference request')
+    }
+    
+    setSending(false)
   }
 
   function generateToken(): string {
@@ -455,18 +519,47 @@ export default function ReferencesPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Reference Check</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-gray-900">Reference Check</h1>
+                {selectedReference.status === 'completed' && (
+                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                    Submitted
+                  </span>
+                )}
+                {selectedReference.status === 'pending' && (
+                  <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+                    Awaiting Response
+                  </span>
+                )}
+                {selectedReference.status === 'no_response' && (
+                  <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                    No Response
+                  </span>
+                )}
+              </div>
               <p className="text-gray-500">For {candidate.first_name} {candidate.last_name}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => printReference(selectedReference)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-              {isAdmin && (
+              {selectedReference.status === 'completed' && (
+                <button
+                  onClick={() => printReference(selectedReference)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </button>
+              )}
+              {selectedReference.status === 'no_response' && canManageReference(selectedReference) && (
+                <button
+                  onClick={() => resendReferenceEmail(selectedReference)}
+                  disabled={sending}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {sending ? 'Sending...' : 'Resend'}
+                </button>
+              )}
+              {canManageReference(selectedReference) && (
                 <button
                   onClick={() => deleteReference(selectedReference)}
                   className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
@@ -544,6 +637,7 @@ export default function ReferencesPage() {
   // Main references list view
   const completedReferences = references.filter(r => r.status === 'completed')
   const pendingReferences = references.filter(r => r.status === 'pending')
+  const noResponseReferences = references.filter(r => r.status === 'no_response')
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -631,16 +725,17 @@ export default function ReferencesPage() {
 
       {/* Pending References */}
       {pendingReferences.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5 text-yellow-600" />
-            Pending Requests ({pendingReferences.length})
+            Awaiting Response ({pendingReferences.length})
           </h2>
           <div className="space-y-3">
             {pendingReferences.map((ref) => (
               <div
                 key={ref.id}
-                className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-100"
+                onClick={() => setSelectedReference(ref)}
+                className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-100 hover:bg-yellow-100 cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-yellow-200 rounded-full flex items-center justify-center">
@@ -654,7 +749,8 @@ export default function ReferencesPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-yellow-700 font-medium">Awaiting response</span>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       const url = `${window.location.origin}/reference/${ref.token}`
                       navigator.clipboard.writeText(url)
                       alert('Reference link copied to clipboard!')
@@ -664,13 +760,66 @@ export default function ReferencesPage() {
                   >
                     <Copy className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => deleteReference(ref)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canManageReference(ref) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteReference(ref) }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* No Response References */}
+      {noResponseReferences.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500" />
+            No Response ({noResponseReferences.length})
+          </h2>
+          <div className="space-y-3">
+            {noResponseReferences.map((ref) => (
+              <div
+                key={ref.id}
+                onClick={() => setSelectedReference(ref)}
+                className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100 hover:bg-red-100 cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-red-200 rounded-full flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-red-700" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">{ref.reference_name || 'Unknown'}</h3>
+                    <p className="text-sm text-gray-500">{ref.reference_email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-red-700 font-medium">No response</span>
+                  {canManageReference(ref) && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); resendReferenceEmail(ref) }}
+                        disabled={sending}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-colors disabled:opacity-50"
+                        title="Resend"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteReference(ref) }}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

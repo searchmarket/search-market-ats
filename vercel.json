@@ -6,3 +6,12 @@
     }
   ]
 }
+
+{
+  "crons": [
+    {
+      "path": "/api/cron/reference-reminders",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}

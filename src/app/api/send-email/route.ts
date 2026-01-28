@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { to, referenceName, candidateName, recruiterName, referenceUrl } = body
+    const { to, referenceName, candidateName, recruiterName, referenceUrl, isReminder } = body
 
     const apiKey = process.env.RESEND_API_KEY
 
@@ -16,12 +16,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Use Resend's test domain until your domain is verified
-    // Change to 'Search.Market <noreply@search.market>' after domain verification
+    // Use verified domain
     const fromAddress = 'Search.Market <noreply@search.market>'
+    
+    // Subject line changes based on whether it's a reminder
+    const subject = isReminder 
+      ? `Reminder: Reference Check for ${candidateName}`
+      : `Reference Check for ${candidateName}`
 
     console.log('Sending email to:', to)
     console.log('From:', fromAddress)
+    console.log('Subject:', subject)
     console.log('Reference URL:', referenceUrl)
 
     const response = await fetch('https://api.resend.com/emails', {
@@ -33,7 +38,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         from: fromAddress,
         to: to,
-        subject: `Reference Check for ${candidateName}`,
+        subject: subject,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <p>Hi,</p>
