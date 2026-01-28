@@ -2,173 +2,162 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import { countries, provinces } from '@/lib/location-data'
+import RichTextEditor from '@/components/RichTextEditor'
+import Link from 'next/link'
 import { 
-  Plus, Search, Users, MoreVertical, Pencil, Trash2, X, Mail, Phone, 
-  MapPin, Briefcase, Linkedin, Github, Facebook, Instagram, ArrowLeft,
-  FileText, UserPlus, Upload, Loader2, Clock, Lock, Unlock, MessageSquare,
-  PhoneCall, Calendar, User, AlertCircle, Download, File, Image, CreditCard, FolderOpen, FileCheck
+  Plus, Search, Briefcase, MoreVertical, Pencil, Trash2, X, Building2, 
+  MapPin, DollarSign, ArrowLeft, Users, Sparkles, Globe, EyeOff, Loader2,
+  Lock, Unlock, Clock, RefreshCw
 } from 'lucide-react'
 
-interface Job {
+interface Client {
   id: string
-  title: string
-  clients: { company_name: string } | null
-}
-
-interface Application {
-  id: string
-  stage: string
-  job_id: string
-  jobs: Job
+  company_name: string
 }
 
 interface Candidate {
   id: string
   first_name: string
   last_name: string
-  email: string | null
-  phone: string | null
-  linkedin_url: string | null
-  github_url: string | null
-  facebook_url: string | null
-  instagram_url: string | null
-  city: string | null
-  state: string | null
-  country: string | null
   current_title: string | null
-  current_company: string | null
-  years_experience: number | null
-  skills: string[] | null
-  notes: string | null
-  source: string | null
-  status: string
-  created_at: string
   owned_by: string | null
   owned_at: string | null
   exclusive_until: string | null
-  last_two_way_contact: string | null
-  recruiter_id: string
-  owner?: { full_name: string | null; email: string } | null
+  owner?: { full_name: string | null } | null
 }
 
-interface ActivityLog {
+interface Application {
   id: string
+  stage: string
   candidate_id: string
-  recruiter_id: string
-  activity_type: string
-  direction: string | null
-  channel: string | null
-  notes: string | null
-  metadata: any
-  duration_seconds: number | null
-  created_at: string
-  recruiter?: { full_name: string | null } | null
+  candidates: Candidate
 }
 
-interface CandidateFile {
+interface Job {
   id: string
-  candidate_id: string
-  recruiter_id: string
-  file_name: string
-  file_type: string
-  file_path: string
-  file_size: number | null
-  mime_type: string | null
+  title: string
+  client_id: string | null
+  clients: Client | null
+  city: string | null
+  state: string | null
+  country: string | null
+  location_type: string
+  employment_type: string
+  salary_min: number | null
+  salary_max: number | null
+  salary_currency: string
+  fee_percent: number | null
+  status: string
+  description: string | null
+  requirements: string | null
+  is_published: boolean
   created_at: string
+  recruiter_id: string
 }
 
-export default function CandidatesPage() {
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const [candidates, setCandidates] = useState<Candidate[]>([])
+export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [applications, setApplications] = useState<Application[]>([])
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
-  const [candidateFiles, setCandidateFiles] = useState<CandidateFile[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'platform' | 'mine' | 'closed'>('platform')
   const [showModal, setShowModal] = useState(false)
   const [showDetailView, setShowDetailView] = useState(false)
-  const [showAddToJobModal, setShowAddToJobModal] = useState(false)
-  const [showLogActivityModal, setShowLogActivityModal] = useState(false)
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
-  const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null)
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  const [editingJob, setEditingJob] = useState<Job | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
-  const [parsingResume, setParsingResume] = useState(false)
-  const [generatingResume, setGeneratingResume] = useState(false)
-  const [claimingCandidate, setClaimingCandidate] = useState(false)
+  const [generatingJD, setGeneratingJD] = useState(false)
+  const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [activeTab, setActiveTab] = useState<'mine' | 'new' | 'all'>('mine')
-  const [uploadingFile, setUploadingFile] = useState(false)
-  const [uploadingResume, setUploadingResume] = useState(false)
   const supabase = createClient()
-
-  const [activityFormData, setActivityFormData] = useState({
-    activity_type: 'note',
-    channel: '',
-    direction: '',
-    notes: '',
-    duration_seconds: ''
-  })
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    linkedin_url: '',
-    github_url: '',
-    facebook_url: '',
-    instagram_url: '',
+    title: '',
+    client_id: '',
+    description: '',
+    requirements: '',
     city: '',
     state: '',
     country: 'CA',
-    current_title: '',
-    current_company: '',
-    years_experience: '',
-    skills: '',
-    notes: '',
-    source: '',
-    status: 'active'
+    location_type: 'onsite',
+    employment_type: 'permanent',
+    salary_min: '',
+    salary_max: '',
+    salary_currency: 'CAD',
+    fee_percent: '',
+    status: 'open'
   })
 
   const availableProvinces = provinces[formData.country] || []
 
+  // Handle deep linking from query params
   useEffect(() => {
-    getCurrentUser()
-    fetchCandidates()
-    fetchJobs()
-  }, [])
-
-  // Handle deep link to specific candidate
-  useEffect(() => {
-    const candidateId = searchParams.get('id')
-    if (candidateId && candidates.length > 0) {
-      const candidate = candidates.find(c => c.id === candidateId)
-      if (candidate) {
-        setSelectedCandidate(candidate)
+    const jobId = searchParams.get('id')
+    if (jobId && jobs.length > 0) {
+      const job = jobs.find(j => j.id === jobId)
+      if (job) {
+        setSelectedJob(job)
         setShowDetailView(true)
       }
     }
-  }, [searchParams, candidates])
+  }, [searchParams, jobs])
+
+  useEffect(() => {
+    fetchJobs()
+    fetchClients()
+    getCurrentUser()
+  }, [])
 
   useEffect(() => {
     if (formData.state && !availableProvinces.find(p => p.code === formData.state)) {
       setFormData(prev => ({ ...prev, state: '' }))
     }
+    if (formData.country === 'CA') {
+      setFormData(prev => ({ ...prev, salary_currency: 'CAD' }))
+    } else if (formData.country === 'US') {
+      setFormData(prev => ({ ...prev, salary_currency: 'USD' }))
+    }
   }, [formData.country])
 
   useEffect(() => {
-    if (selectedCandidate) {
-      fetchApplicationsForCandidate(selectedCandidate.id)
-      fetchActivityLogs(selectedCandidate.id)
-      fetchCandidateFiles(selectedCandidate.id)
+    if (selectedJob) {
+      fetchApplicationsForJob(selectedJob.id)
     }
-  }, [selectedCandidate])
+  }, [selectedJob])
+
+  async function fetchJobs() {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*, clients(id, company_name), recruiter_id')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching jobs:', error)
+    } else {
+      setJobs((data as unknown as Job[]) || [])
+    }
+    setLoading(false)
+  }
+
+  async function fetchClients() {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, company_name')
+      .eq('status', 'active')
+      .order('company_name')
+
+    if (error) {
+      console.error('Error fetching clients:', error)
+    } else {
+      setClients((data as unknown as Client[]) || [])
+    }
+  }
 
   async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -188,209 +177,40 @@ export default function CandidatesPage() {
     }
   }
 
-  async function fetchCandidates() {
-    const { data, error } = await supabase
-      .from('candidates')
-      .select('*, owner:recruiters!owned_by(full_name, email)')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching candidates:', error)
-    } else {
-      setCandidates((data as unknown as Candidate[]) || [])
-    }
-    setLoading(false)
+  function getOwnershipStatus(candidate: Candidate): 'owned' | 'exclusive' | 'open' {
+    if (candidate.owned_by) return 'owned'
+    if (candidate.exclusive_until && new Date(candidate.exclusive_until) > new Date()) return 'exclusive'
+    return 'open'
   }
 
-  async function fetchActivityLogs(candidateId: string) {
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('*, recruiter:recruiters(full_name)')
-      .eq('candidate_id', candidateId)
-      .order('created_at', { ascending: false })
+  function getOwnershipBadge(candidate: Candidate) {
+    const status = getOwnershipStatus(candidate)
+    const isOwner = candidate.owned_by === currentUserId
 
-    if (error) {
-      console.error('Error fetching activity logs:', error)
-    } else {
-      setActivityLogs((data as unknown as ActivityLog[]) || [])
-    }
-  }
-
-  async function fetchCandidateFiles(candidateId: string) {
-    const { data, error } = await supabase
-      .from('candidate_files')
-      .select('*')
-      .eq('candidate_id', candidateId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching candidate files:', error)
-    } else {
-      setCandidateFiles((data as unknown as CandidateFile[]) || [])
-    }
-  }
-
-  async function handleUploadResumeToStorage(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!selectedCandidate || !currentUserId) return
-    
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Only PDF supported for AI resume conversion
-    if (file.type !== 'application/pdf') {
-      alert('Only PDF files are supported for resume conversion to Word')
-      return
+    const styles = {
+      owned: { bg: 'bg-red-100', text: 'text-red-700', Icon: Lock },
+      exclusive: { bg: 'bg-yellow-100', text: 'text-yellow-700', Icon: Clock },
+      open: { bg: 'bg-green-100', text: 'text-green-700', Icon: Unlock }
     }
 
-    setUploadingResume(true)
+    const { bg, text, Icon } = styles[status]
+    const label = status === 'owned' 
+      ? (isOwner ? 'Mine' : candidate.owner?.full_name || 'Owned')
+      : status === 'exclusive' ? 'Exclusive' : 'Open'
 
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('candidateId', selectedCandidate.id)
-      formData.append('recruiterId', currentUserId)
-
-      const response = await fetch('/api/upload-resume', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to upload resume')
-      }
-
-      alert('Resume uploaded and converted to Word format!')
-      fetchCandidateFiles(selectedCandidate.id)
-    } catch (error) {
-      console.error('Error uploading resume:', error)
-      alert(error instanceof Error ? error.message : 'Failed to upload resume')
-    }
-
-    setUploadingResume(false)
-    e.target.value = ''
+    return (
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded ${bg} ${text}`}>
+        <Icon className="w-3 h-3" />
+        {label}
+      </span>
+    )
   }
 
-  async function handleUploadFile(e: React.ChangeEvent<HTMLInputElement>, fileType: string) {
-    if (!selectedCandidate || !currentUserId) return
-    
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setUploadingFile(true)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('candidateId', selectedCandidate.id)
-      formData.append('recruiterId', currentUserId)
-      formData.append('fileType', fileType)
-
-      const response = await fetch('/api/candidate-files', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to upload file')
-      }
-
-      alert('File uploaded successfully!')
-      fetchCandidateFiles(selectedCandidate.id)
-    } catch (error) {
-      console.error('Error uploading file:', error)
-      alert(error instanceof Error ? error.message : 'Failed to upload file')
-    }
-
-    setUploadingFile(false)
-    e.target.value = ''
-  }
-
-  async function handleDownloadFile(file: CandidateFile) {
-    try {
-      const response = await fetch('/api/candidate-files/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: file.file_path })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to get download URL')
-      }
-
-      const { url } = await response.json()
-      
-      // Open in new tab or download
-      const link = document.createElement('a')
-      link.href = url
-      link.download = file.file_name
-      link.target = '_blank'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    } catch (error) {
-      console.error('Error downloading file:', error)
-      alert('Failed to download file')
-    }
-  }
-
-  async function handleDeleteFile(file: CandidateFile) {
-    if (!confirm(`Delete "${file.file_name}"? This cannot be undone.`)) return
-
-    try {
-      const response = await fetch('/api/candidate-files', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId: file.id, filePath: file.file_path })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete file')
-      }
-
-      if (selectedCandidate) {
-        fetchCandidateFiles(selectedCandidate.id)
-      }
-    } catch (error) {
-      console.error('Error deleting file:', error)
-      alert('Failed to delete file')
-    }
-  }
-
-  function formatFileSize(bytes: number | null): string {
-    if (!bytes) return '-'
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-
-  function getFileIcon(fileType: string, mimeType: string | null) {
-    if (fileType === 'resume') return FileText
-    if (fileType === 'id') return CreditCard
-    if (mimeType?.startsWith('image/')) return Image
-    return File
-  }
-
-  async function fetchJobs() {
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('id, title, clients(company_name)')
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching jobs:', error)
-    } else {
-      setJobs((data as unknown as Job[]) || [])
-    }
-  }
-
-  async function fetchApplicationsForCandidate(candidateId: string) {
+  async function fetchApplicationsForJob(jobId: string) {
     const { data, error } = await supabase
       .from('applications')
-      .select('id, stage, job_id, jobs(id, title, clients(company_name))')
-      .eq('candidate_id', candidateId)
+      .select('id, stage, candidate_id, candidates(id, first_name, last_name, current_title, owned_by, owned_at, exclusive_until, owner:recruiters!owned_by(full_name))')
+      .eq('job_id', jobId)
 
     if (error) {
       console.error('Error fetching applications:', error)
@@ -399,241 +219,84 @@ export default function CandidatesPage() {
     }
   }
 
-  // Ownership status helper
-  function getOwnershipStatus(candidate: Candidate): 'owned' | 'exclusive' | 'open' {
-    const now = new Date()
-    
-    // Check if in exclusive window
-    if (candidate.exclusive_until && new Date(candidate.exclusive_until) > now) {
-      return 'exclusive'
+  async function generateJobDescription() {
+    if (!formData.title) {
+      alert('Please enter a job title first')
+      return
     }
-    
-    // Check if owned
-    if (candidate.owned_by) {
-      return 'owned'
-    }
-    
-    return 'open'
-  }
 
-  // Check if current user can claim
-  function canClaim(candidate: Candidate): boolean {
-    const status = getOwnershipStatus(candidate)
-    
-    if (status === 'open') return true
-    if (status === 'exclusive' && candidate.recruiter_id === currentUserId) return true
-    
-    return false
-  }
+    setGeneratingJD(true)
 
-  // Check if current user owns this candidate
-  function isOwner(candidate: Candidate): boolean {
-    return candidate.owned_by === currentUserId
-  }
-
-  async function claimCandidate(candidate: Candidate) {
-    if (!currentUserId) return
-    
-    setClaimingCandidate(true)
-
-    const { error } = await supabase
-      .from('candidates')
-      .update({
-        owned_by: currentUserId,
-        owned_at: new Date().toISOString()
-      })
-      .eq('id', candidate.id)
-
-    if (error) {
-      console.error('Error claiming candidate:', error)
-      alert('Error claiming candidate')
-    } else {
-      // Log the claim activity
-      await supabase.from('activity_logs').insert([{
-        candidate_id: candidate.id,
-        recruiter_id: currentUserId,
-        activity_type: 'claimed',
-        channel: 'system',
-        notes: 'Candidate claimed'
-      }])
-
-      // Refresh data
-      fetchCandidates()
-      if (selectedCandidate?.id === candidate.id) {
-        setSelectedCandidate({
-          ...selectedCandidate,
-          owned_by: currentUserId,
-          owned_at: new Date().toISOString()
+    try {
+      const response = await fetch('/api/generate-jd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formData.title,
+          company: clients.find(c => c.id === formData.client_id)?.company_name || '',
+          location: formData.city,
+          locationType: formData.location_type,
+          employmentType: formData.employment_type,
+          salaryMin: formData.salary_min,
+          salaryMax: formData.salary_max,
+          currency: formData.salary_currency
         })
-        fetchActivityLogs(candidate.id)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to generate description')
       }
+
+      const data = await response.json()
+      setFormData(prev => ({
+        ...prev,
+        description: data.description,
+        requirements: data.requirements
+      }))
+    } catch (error) {
+      console.error('Error generating JD:', error)
+      alert(error instanceof Error ? error.message : 'Failed to generate job description. Make sure API key is configured.')
     }
 
-    setClaimingCandidate(false)
+    setGeneratingJD(false)
   }
 
-  async function releaseCandidate(candidate: Candidate) {
-    if (!currentUserId) return
-    
-    if (!confirm('Are you sure you want to release this candidate? Another recruiter can claim them.')) return
+  async function anonymizeJobDescription() {
+    if (!formData.description && !formData.requirements) {
+      alert('Please add description or requirements first')
+      return
+    }
 
-    const { error } = await supabase
-      .from('candidates')
-      .update({
-        owned_by: null,
-        owned_at: null
-      })
-      .eq('id', candidate.id)
+    setRewritingJD(true)
 
-    if (error) {
-      console.error('Error releasing candidate:', error)
-      alert('Error releasing candidate')
-    } else {
-      // Log the release activity
-      await supabase.from('activity_logs').insert([{
-        candidate_id: candidate.id,
-        recruiter_id: currentUserId,
-        activity_type: 'released',
-        channel: 'system',
-        notes: 'Candidate released'
-      }])
-
-      // Refresh data
-      fetchCandidates()
-      if (selectedCandidate?.id === candidate.id) {
-        setSelectedCandidate({
-          ...selectedCandidate,
-          owned_by: null,
-          owned_at: null
+    try {
+      const response = await fetch('/api/anonymize-jd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: formData.description || '',
+          requirements: formData.requirements || ''
         })
-        fetchActivityLogs(candidate.id)
-      }
-    }
-  }
-
-  async function handleClaimCandidate() {
-    if (!selectedCandidate || !currentUserId) return
-    
-    setClaimingCandidate(true)
-
-    const { error } = await supabase
-      .from('candidates')
-      .update({
-        owned_by: currentUserId,
-        owned_at: new Date().toISOString()
       })
-      .eq('id', selectedCandidate.id)
 
-    if (error) {
-      console.error('Error claiming candidate:', error)
-      alert('Error claiming candidate')
-    } else {
-      // Log the claim activity
-      await supabase.from('activity_logs').insert([{
-        candidate_id: selectedCandidate.id,
-        recruiter_id: currentUserId,
-        activity_type: 'claimed',
-        channel: 'system',
-        notes: 'Candidate claimed'
-      }])
-
-      // Refresh data
-      fetchCandidates()
-      setSelectedCandidate({
-        ...selectedCandidate,
-        owned_by: currentUserId,
-        owned_at: new Date().toISOString()
-      })
-      fetchActivityLogs(selectedCandidate.id)
-    }
-
-    setClaimingCandidate(false)
-  }
-
-  async function handleReleaseCandidate() {
-    if (!selectedCandidate || !currentUserId) return
-    
-    if (!confirm('Are you sure you want to release this candidate? Another recruiter can claim them.')) return
-
-    const { error } = await supabase
-      .from('candidates')
-      .update({
-        owned_by: null,
-        owned_at: null
-      })
-      .eq('id', selectedCandidate.id)
-
-    if (error) {
-      console.error('Error releasing candidate:', error)
-      alert('Error releasing candidate')
-    } else {
-      // Log the release activity
-      await supabase.from('activity_logs').insert([{
-        candidate_id: selectedCandidate.id,
-        recruiter_id: currentUserId,
-        activity_type: 'released',
-        channel: 'system',
-        notes: 'Candidate released'
-      }])
-
-      // Refresh data
-      fetchCandidates()
-      setSelectedCandidate({
-        ...selectedCandidate,
-        owned_by: null,
-        owned_at: null
-      })
-      fetchActivityLogs(selectedCandidate.id)
-    }
-  }
-
-  async function handleLogActivity(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedCandidate || !currentUserId) return
-
-    const { error } = await supabase.from('activity_logs').insert([{
-      candidate_id: selectedCandidate.id,
-      recruiter_id: currentUserId,
-      activity_type: activityFormData.activity_type,
-      channel: activityFormData.channel || null,
-      direction: activityFormData.direction || null,
-      notes: activityFormData.notes || null,
-      duration_seconds: activityFormData.duration_seconds ? parseInt(activityFormData.duration_seconds) : null
-    }])
-
-    if (error) {
-      console.error('Error logging activity:', error)
-      alert('Error logging activity')
-    } else {
-      // If this is a two-way communication, update last_two_way_contact
-      if (activityFormData.direction === 'inbound' || 
-          (activityFormData.direction === 'outbound' && activityFormData.activity_type === 'message')) {
-        await supabase
-          .from('candidates')
-          .update({ last_two_way_contact: new Date().toISOString() })
-          .eq('id', selectedCandidate.id)
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to anonymize content')
       }
 
-      setShowLogActivityModal(false)
-      setActivityFormData({
-        activity_type: 'note',
-        channel: '',
-        direction: '',
-        notes: '',
-        duration_seconds: ''
-      })
-      fetchActivityLogs(selectedCandidate.id)
+      const data = await response.json()
+      setFormData(prev => ({
+        ...prev,
+        description: data.description && data.description !== 'N/A' ? data.description : prev.description,
+        requirements: data.requirements && data.requirements !== 'N/A' ? data.requirements : prev.requirements
+      }))
+    } catch (error) {
+      console.error('Error anonymizing JD:', error)
+      alert(error instanceof Error ? error.message : 'Failed to anonymize job description.')
     }
-  }
 
-  // Helper to normalize URLs - adds https:// if missing
-  function normalizeUrl(url: string | null): string | null {
-    if (!url || url.trim() === '') return null
-    const trimmed = url.trim()
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed
-    }
-    return `https://${trimmed}`
+    setRewritingJD(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -642,161 +305,133 @@ export default function CandidatesPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const candidateData = {
-      first_name: formData.first_name,
-      last_name: formData.last_name,
-      email: formData.email || null,
-      phone: formData.phone || null,
-      linkedin_url: normalizeUrl(formData.linkedin_url),
-      github_url: normalizeUrl(formData.github_url),
-      facebook_url: normalizeUrl(formData.facebook_url),
-      instagram_url: normalizeUrl(formData.instagram_url),
+    // Validate salary range is provided
+    if (!formData.salary_min || !formData.salary_max) {
+      alert('Salary range (min and max) is required for all jobs')
+      return
+    }
+
+    const jobData = {
+      title: formData.title,
+      client_id: formData.client_id || null,
+      description: formData.description || null,
+      requirements: formData.requirements || null,
       city: formData.city || null,
       state: formData.state || null,
       country: formData.country,
-      current_title: formData.current_title || null,
-      current_company: formData.current_company || null,
-      years_experience: formData.years_experience ? parseFloat(formData.years_experience) : null,
-      skills: formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(Boolean) : null,
-      notes: formData.notes || null,
-      source: formData.source || null,
+      location_type: formData.location_type,
+      employment_type: formData.employment_type,
+      salary_min: parseFloat(formData.salary_min),
+      salary_max: parseFloat(formData.salary_max),
+      salary_currency: formData.salary_currency,
+      fee_percent: formData.fee_percent ? parseFloat(formData.fee_percent) : null,
       status: formData.status
     }
 
-    if (editingCandidate) {
+    if (editingJob) {
       const { error } = await supabase
-        .from('candidates')
-        .update(candidateData)
-        .eq('id', editingCandidate.id)
+        .from('jobs')
+        .update(jobData)
+        .eq('id', editingJob.id)
 
       if (error) {
-        console.error('Error updating candidate:', error)
-        alert('Error updating candidate')
+        console.error('Error updating job:', error)
+        alert('Error updating job')
       } else {
         setShowModal(false)
-        setEditingCandidate(null)
+        setEditingJob(null)
         resetForm()
-        fetchCandidates()
-        if (selectedCandidate?.id === editingCandidate.id) {
-          setSelectedCandidate({ ...selectedCandidate, ...candidateData })
+        fetchJobs()
+        if (selectedJob?.id === editingJob.id) {
+          setSelectedJob({ ...selectedJob, ...jobData, clients: selectedJob.clients })
         }
       }
     } else {
       const { error } = await supabase
-        .from('candidates')
-        .insert([{ ...candidateData, recruiter_id: user.id }])
+        .from('jobs')
+        .insert([{ ...jobData, recruiter_id: user.id, is_published: false }])
 
       if (error) {
-        console.error('Error creating candidate:', error)
-        alert('Error creating candidate')
+        console.error('Error creating job:', error)
+        alert('Error creating job')
       } else {
         setShowModal(false)
         resetForm()
-        fetchCandidates()
+        fetchJobs()
       }
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this candidate?')) return
+    if (!confirm('Are you sure you want to delete this job?')) return
 
     const { error } = await supabase
-      .from('candidates')
+      .from('jobs')
       .delete()
       .eq('id', id)
 
     if (error) {
-      console.error('Error deleting candidate:', error)
-      alert('Error deleting candidate')
+      console.error('Error deleting job:', error)
+      alert('Error deleting job')
     } else {
-      fetchCandidates()
-      if (selectedCandidate?.id === id) {
+      fetchJobs()
+      if (selectedJob?.id === id) {
         setShowDetailView(false)
-        setSelectedCandidate(null)
+        setSelectedJob(null)
       }
     }
     setMenuOpen(null)
   }
 
-  async function handleAddToJob(jobId: string) {
-    if (!selectedCandidate) return
+  async function togglePublish(job: Job) {
+    const newPublishState = !job.is_published
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { error } = await supabase
-      .from('applications')
-      .insert([{
-        job_id: jobId,
-        candidate_id: selectedCandidate.id,
-        recruiter_id: user.id,
-        stage: 'sourced'
-      }])
-
-    if (error) {
-      if (error.code === '23505') {
-        alert('Candidate is already added to this job')
-      } else {
-        console.error('Error adding to job:', error)
-        alert('Error adding candidate to job')
-      }
-    } else {
-      setShowAddToJobModal(false)
-      fetchApplicationsForCandidate(selectedCandidate.id)
-    }
-  }
-
-  async function handleRemoveFromJob(applicationId: string) {
-    if (!selectedCandidate) return
-    
-    // Only owners can remove candidates from jobs
-    if (!isOwner(selectedCandidate)) {
-      alert('Only the candidate owner can remove them from jobs')
+    // Don't allow publishing without salary range
+    if (newPublishState && (!job.salary_min || !job.salary_max)) {
+      alert('Cannot publish job without salary range. Please add salary min and max first.')
       return
     }
 
-    if (!confirm('Are you sure you want to remove this candidate from this job?')) return
-
     const { error } = await supabase
-      .from('applications')
-      .delete()
-      .eq('id', applicationId)
+      .from('jobs')
+      .update({ is_published: newPublishState })
+      .eq('id', job.id)
 
     if (error) {
-      console.error('Error removing from job:', error)
-      alert('Error removing candidate from job')
+      console.error('Error updating publish status:', error)
+      alert('Error updating publish status')
     } else {
-      fetchApplicationsForCandidate(selectedCandidate.id)
+      fetchJobs()
+      if (selectedJob?.id === job.id) {
+        setSelectedJob({ ...selectedJob, is_published: newPublishState })
+      }
     }
   }
 
-  function openDetailView(candidate: Candidate) {
-    setSelectedCandidate(candidate)
+  function openDetailView(job: Job) {
+    setSelectedJob(job)
     setShowDetailView(true)
     setMenuOpen(null)
+    router.push(`/dashboard/jobs?id=${job.id}`, { scroll: false })
   }
 
-  function openEditModal(candidate: Candidate) {
-    setEditingCandidate(candidate)
+  function openEditModal(job: Job) {
+    setEditingJob(job)
     setFormData({
-      first_name: candidate.first_name,
-      last_name: candidate.last_name,
-      email: candidate.email || '',
-      phone: candidate.phone || '',
-      linkedin_url: candidate.linkedin_url || '',
-      github_url: candidate.github_url || '',
-      facebook_url: candidate.facebook_url || '',
-      instagram_url: candidate.instagram_url || '',
-      city: candidate.city || '',
-      state: candidate.state || '',
-      country: candidate.country || 'CA',
-      current_title: candidate.current_title || '',
-      current_company: candidate.current_company || '',
-      years_experience: candidate.years_experience?.toString() || '',
-      skills: candidate.skills?.join(', ') || '',
-      notes: candidate.notes || '',
-      source: candidate.source || '',
-      status: candidate.status
+      title: job.title,
+      client_id: job.client_id || '',
+      description: job.description || '',
+      requirements: job.requirements || '',
+      city: job.city || '',
+      state: job.state || '',
+      country: job.country || 'CA',
+      location_type: job.location_type,
+      employment_type: job.employment_type,
+      salary_min: job.salary_min?.toString() || '',
+      salary_max: job.salary_max?.toString() || '',
+      salary_currency: job.salary_currency,
+      fee_percent: job.fee_percent?.toString() || '',
+      status: job.status
     })
     setShowModal(true)
     setMenuOpen(null)
@@ -804,260 +439,75 @@ export default function CandidatesPage() {
 
   function resetForm() {
     setFormData({
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      linkedin_url: '',
-      github_url: '',
-      facebook_url: '',
-      instagram_url: '',
+      title: '',
+      client_id: '',
+      description: '',
+      requirements: '',
       city: '',
       state: '',
       country: 'CA',
-      current_title: '',
-      current_company: '',
-      years_experience: '',
-      skills: '',
-      notes: '',
-      source: '',
-      status: 'active'
+      location_type: 'onsite',
+      employment_type: 'permanent',
+      salary_min: '',
+      salary_max: '',
+      salary_currency: 'CAD',
+      fee_percent: '',
+      status: 'open'
     })
-    setEditingCandidate(null)
+    setEditingJob(null)
   }
 
-  async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Validate file type
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']
-    if (!validTypes.includes(file.type)) {
-      alert('Please upload a PDF or Word document')
-      return
-    }
-
-    setParsingResume(true)
-
-    try {
-      const formDataUpload = new FormData()
-      formDataUpload.append('file', file)
-
-      const response = await fetch('/api/parse-resume', {
-        method: 'POST',
-        body: formDataUpload
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to parse resume')
-      }
-
-      const data = await response.json()
-
-      // Update form with parsed data
-      setFormData(prev => ({
-        ...prev,
-        first_name: data.first_name || prev.first_name,
-        last_name: data.last_name || prev.last_name,
-        email: data.email || prev.email,
-        phone: data.phone || prev.phone,
-        linkedin_url: data.linkedin_url || prev.linkedin_url,
-        github_url: data.github_url || prev.github_url,
-        city: data.city || prev.city,
-        state: data.state || prev.state,
-        country: data.country || prev.country,
-        current_title: data.current_title || prev.current_title,
-        current_company: data.current_company || prev.current_company,
-        years_experience: data.years_experience?.toString() || prev.years_experience,
-        skills: data.skills?.join(', ') || prev.skills,
-        notes: data.summary || prev.notes,
-        source: 'Resume Upload'
-      }))
-
-      setShowModal(true)
-    } catch (error) {
-      console.error('Error parsing resume:', error)
-      alert(error instanceof Error ? error.message : 'Failed to parse resume. Please try again.')
-    }
-
-    setParsingResume(false)
-    // Reset file input
-    e.target.value = ''
-  }
-
-  async function handleResumeUploadForCandidate(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!selectedCandidate) return
+  // Only show open jobs, filtered by tab
+  const filteredJobs = jobs.filter(job => {
+    // Only show open jobs
+    if (job.status !== 'open') return false
     
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']
-    if (!validTypes.includes(file.type)) {
-      alert('Please upload a PDF or Word document')
-      return
-    }
-
-    if (!confirm('This will overwrite the current candidate data with information from the resume. Continue?')) {
-      e.target.value = ''
-      return
-    }
-
-    setParsingResume(true)
-
-    try {
-      const formDataUpload = new FormData()
-      formDataUpload.append('file', file)
-
-      const response = await fetch('/api/parse-resume', {
-        method: 'POST',
-        body: formDataUpload
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to parse resume')
-      }
-
-      const data = await response.json()
-
-      // Update candidate directly in database
-      const updateData = {
-        first_name: data.first_name || selectedCandidate.first_name,
-        last_name: data.last_name || selectedCandidate.last_name,
-        email: data.email || selectedCandidate.email,
-        phone: data.phone || selectedCandidate.phone,
-        linkedin_url: data.linkedin_url || selectedCandidate.linkedin_url,
-        github_url: data.github_url || selectedCandidate.github_url,
-        city: data.city || selectedCandidate.city,
-        state: data.state || selectedCandidate.state,
-        country: data.country || selectedCandidate.country,
-        current_title: data.current_title || selectedCandidate.current_title,
-        current_company: data.current_company || selectedCandidate.current_company,
-        years_experience: data.years_experience || selectedCandidate.years_experience,
-        skills: data.skills || selectedCandidate.skills,
-        notes: data.summary || selectedCandidate.notes
-      }
-
-      const { error } = await supabase
-        .from('candidates')
-        .update(updateData)
-        .eq('id', selectedCandidate.id)
-
-      if (error) {
-        throw new Error('Failed to update candidate')
-      }
-
-      // Update local state
-      setSelectedCandidate({ ...selectedCandidate, ...updateData })
-      fetchCandidates()
-      alert('Candidate profile updated from resume!')
-
-    } catch (error) {
-      console.error('Error parsing resume:', error)
-      alert(error instanceof Error ? error.message : 'Failed to parse resume. Please try again.')
-    }
-
-    setParsingResume(false)
-    e.target.value = ''
-  }
-
-  async function handleGenerateResume() {
-    if (!selectedCandidate) return
-
-    setGeneratingResume(true)
-
-    try {
-      const response = await fetch('/api/generate-resume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedCandidate)
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to generate resume')
-      }
-
-      const { html } = await response.json()
-
-      // Open in new window for printing/saving
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(html)
-        printWindow.document.close()
-      } else {
-        alert('Please allow popups to view the resume')
-      }
-    } catch (error) {
-      console.error('Error generating resume:', error)
-      alert(error instanceof Error ? error.message : 'Failed to generate resume. Please try again.')
-    }
-
-    setGeneratingResume(false)
-  }
-
-  const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = 
-      `${candidate.first_name} ${candidate.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.current_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.skills?.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+    // Search filter
+    const matchesSearch = !searchQuery ||
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.clients?.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
     
     if (!matchesSearch) return false
-
-    // Tab filter
-    if (activeTab === 'mine') {
-      return candidate.owned_by === currentUserId
-    }
-    if (activeTab === 'new') {
-      // Unclaimed candidates: not owned by anyone
-      return !candidate.owned_by
-    }
     
+    // Tab filter - wait for currentUserId to be loaded
+    if (!currentUserId) return true // Show all while loading
+    
+    if (activeTab === 'platform') {
+      // Platform Jobs: all open jobs from OTHER recruiters
+      return job.recruiter_id !== currentUserId && job.status === 'open'
+    } else if (activeTab === 'mine') {
+      // My Jobs: only open jobs I created
+      return job.recruiter_id === currentUserId && job.status === 'open'
+    } else if (activeTab === 'closed') {
+      // My Closed Jobs: filled or cancelled jobs I created
+      return job.recruiter_id === currentUserId && (job.status === 'filled' || job.status === 'cancelled')
+    }
     return true
   })
 
-  // Count for tabs
-  const myCandidatesCount = candidates.filter(c => c.owned_by === currentUserId).length
-  const unclaimedCandidatesCount = candidates.filter(c => !c.owned_by).length
+  // Counts for tabs
+  const platformJobsCount = jobs.filter(j => 
+    j.status === 'open' && j.recruiter_id !== currentUserId
+  ).length
+  
+  const myJobsCount = jobs.filter(j => 
+    j.status === 'open' && j.recruiter_id === currentUserId
+  ).length
+  
+  const myClosedJobsCount = jobs.filter(j => 
+    (j.status === 'filled' || j.status === 'cancelled') && j.recruiter_id === currentUserId
+  ).length
 
   const statusColors: Record<string, string> = {
-    active: 'bg-green-100 text-green-700',
-    inactive: 'bg-gray-100 text-gray-700',
-    placed: 'bg-blue-100 text-blue-700',
-    do_not_contact: 'bg-red-100 text-red-700'
-  }
-
-  const ownershipColors: Record<string, { bg: string; text: string; icon: any }> = {
-    owned: { bg: 'bg-red-100', text: 'text-red-700', icon: Lock },
-    exclusive: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
-    open: { bg: 'bg-green-100', text: 'text-green-700', icon: Unlock }
-  }
-
-  const activityTypeLabels: Record<string, string> = {
-    message: 'Message',
-    call: 'Phone Call',
-    meeting: 'Meeting',
-    recruiter_interview: 'Recruiter Interview',
-    client_interview: 'Client Interview',
-    note: 'Note',
-    status_change: 'Status Change',
-    claimed: 'Claimed',
-    released: 'Released'
-  }
-
-  const channelLabels: Record<string, string> = {
-    email: 'Email',
-    phone: 'Phone',
-    sms: 'SMS',
-    linkedin: 'LinkedIn',
-    in_person: 'In Person',
-    system: 'System'
+    draft: 'bg-gray-100 text-gray-700',
+    open: 'bg-green-100 text-green-700',
+    on_hold: 'bg-yellow-100 text-yellow-700',
+    filled: 'bg-blue-100 text-blue-700',
+    cancelled: 'bg-red-100 text-red-700'
   }
 
   const stageColors: Record<string, string> = {
-    applied: 'bg-indigo-100 text-indigo-700',
+    applied: 'bg-blue-100 text-blue-700',
     sourced: 'bg-gray-100 text-gray-700',
     contacted: 'bg-blue-100 text-blue-700',
     screening: 'bg-yellow-100 text-yellow-700',
@@ -1069,22 +519,42 @@ export default function CandidatesPage() {
     withdrawn: 'bg-gray-100 text-gray-700'
   }
 
-  const formatLocation = (city: string | null, state: string | null, country: string | null) => {
+  const formatLocation = (city: string | null, state: string | null, country: string | null, locationType: string) => {
     const stateName = country && state ? provinces[country]?.find(p => p.code === state)?.name || state : state
-    return [city, stateName].filter(Boolean).join(', ') || null
+    const location = [city, stateName].filter(Boolean).join(', ')
+    if (!location) return locationType
+    return `${location} (${locationType})`
+  }
+
+  const formatSalary = (min: number | null, max: number | null, currency: string) => {
+    if (!min && !max) return '-'
+    const fmt = (n: number) => `$${n.toLocaleString()}`
+    if (min && max) return `${fmt(min)} - ${fmt(max)} ${currency}`
+    if (min) return `${fmt(min)}+ ${currency}`
+    if (max) return `Up to ${fmt(max)} ${currency}`
+    return '-'
   }
 
   // Detail View
-  if (showDetailView && selectedCandidate) {
+  if (showDetailView && selectedJob) {
+    const fromClientId = searchParams.get('fromClient')
+    
     return (
       <div className="p-8">
-        {/* Back Button */}
         <button
-          onClick={() => { setShowDetailView(false); setSelectedCandidate(null) }}
+          onClick={() => { 
+            setShowDetailView(false)
+            setSelectedJob(null)
+            if (fromClientId) {
+              router.push(`/dashboard/clients?id=${fromClientId}`)
+            } else {
+              router.push('/dashboard/jobs', { scroll: false })
+            }
+          }}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Candidates
+          {fromClientId ? 'Back to Client' : 'Back to Jobs'}
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1093,292 +563,118 @@ export default function CandidatesPage() {
             {/* Header Card */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-start justify-between mb-4">
-                <div className="flex gap-4">
-                  <div className="w-16 h-16 bg-brand-green/10 rounded-full flex items-center justify-center text-brand-green font-semibold text-2xl">
-                    {selectedCandidate.first_name[0]}{selectedCandidate.last_name[0]}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h1 className="text-2xl font-bold text-gray-900">
-                        {selectedCandidate.first_name} {selectedCandidate.last_name}
-                      </h1>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[selectedCandidate.status]}`}>
-                        {selectedCandidate.status.replace('_', ' ')}
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h1>
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[selectedJob.status]}`}>
+                      {selectedJob.status.replace('_', ' ')}
+                    </span>
+                    {selectedJob.is_published && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-brand-green/10 text-brand-green">
+                        <Globe className="w-3 h-3" />
+                        Published
                       </span>
-                      {/* Ownership Badge */}
-                      {(() => {
-                        const status = getOwnershipStatus(selectedCandidate)
-                        const colors = ownershipColors[status]
-                        const Icon = colors.icon
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
-                            <Icon className="w-3 h-3" />
-                            {status === 'owned' ? (isOwner(selectedCandidate) ? 'You Own' : `Owned by ${selectedCandidate.owner?.full_name || 'Another'}`) : 
-                             status === 'exclusive' ? 'Exclusive' : 'Open'}
-                          </span>
-                        )
-                      })()}
-                    </div>
-                    {(selectedCandidate.current_title || selectedCandidate.current_company) && (
-                      <p className="text-gray-600">
-                        {[selectedCandidate.current_title, selectedCandidate.current_company].filter(Boolean).join(' at ')}
-                      </p>
-                    )}
-                    {selectedCandidate.years_experience && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        {selectedCandidate.years_experience} years experience
-                      </p>
                     )}
                   </div>
+                  {selectedJob.clients && (
+                    <p className="text-lg text-gray-600">{selectedJob.clients.company_name}</p>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  {/* Claim/Release Button */}
-                  {!isOwner(selectedCandidate) && (
-                    <button
-                      onClick={handleClaimCandidate}
-                      disabled={claimingCandidate || !canClaim(selectedCandidate)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                        canClaim(selectedCandidate) 
-                          ? 'bg-green-600 text-white hover:bg-green-700' 
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      {claimingCandidate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                      Claim
-                    </button>
-                  )}
-                  {isOwner(selectedCandidate) && (
-                    <button
-                      onClick={handleReleaseCandidate}
-                      className="flex items-center gap-2 px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
-                    >
-                      <Unlock className="w-4 h-4" />
-                      Release
-                    </button>
-                  )}
                   <button
-                    onClick={() => openEditModal(selectedCandidate)}
+                    onClick={() => openEditModal(selectedJob)}
                     className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
                   >
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
                   <button
-                    onClick={() => setShowAddToJobModal(true)}
-                    disabled={!isOwner(selectedCandidate) && !isAdmin}
+                    onClick={() => togglePublish(selectedJob)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                      isOwner(selectedCandidate) || isAdmin
-                        ? 'bg-brand-green text-white hover:bg-green-700'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      selectedJob.is_published
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-brand-green text-white hover:bg-green-700'
                     }`}
-                    title={!isOwner(selectedCandidate) && !isAdmin ? 'Only candidate owners or admins can add to jobs' : ''}
                   >
-                    <UserPlus className="w-4 h-4" />
-                    Add to Job
-                  </button>
-                  <button
-                    onClick={() => router.push(`/dashboard/references?candidateId=${selectedCandidate.id}`)}
-                    className="flex items-center gap-2 px-3 py-2 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50"
-                  >
-                    <FileCheck className="w-4 h-4" />
-                    References
+                    {selectedJob.is_published ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                    {selectedJob.is_published ? 'Unpublish' : 'Publish to Board'}
                   </button>
                 </div>
               </div>
 
-              {/* Contact Info */}
-              <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-100">
-                {selectedCandidate.email && (
-                  <a href={`mailto:${selectedCandidate.email}`} className="flex items-center gap-2 text-gray-600 hover:text-brand-blue">
-                    <Mail className="w-4 h-4" />
-                    {selectedCandidate.email}
-                  </a>
-                )}
-                {selectedCandidate.phone && (
-                  <a href={`tel:${selectedCandidate.phone}`} className="flex items-center gap-2 text-gray-600 hover:text-brand-blue">
-                    <Phone className="w-4 h-4" />
-                    {selectedCandidate.phone}
-                  </a>
-                )}
-                {formatLocation(selectedCandidate.city, selectedCandidate.state, selectedCandidate.country) && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <MapPin className="w-4 h-4" />
-                    {formatLocation(selectedCandidate.city, selectedCandidate.state, selectedCandidate.country)}
+              <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-4 h-4" />
+                  {formatLocation(selectedJob.city, selectedJob.state, selectedJob.country, selectedJob.location_type)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <DollarSign className="w-4 h-4" />
+                  {formatSalary(selectedJob.salary_min, selectedJob.salary_max, selectedJob.salary_currency)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Briefcase className="w-4 h-4" />
+                  {selectedJob.employment_type.replace('_', ' ')}
+                </div>
+                {selectedJob.fee_percent && (
+                  <div className="text-brand-green font-medium">
+                    {selectedJob.fee_percent}% fee
                   </div>
                 )}
               </div>
-
-              {/* Social Links */}
-              <div className="flex flex-wrap gap-3 pt-4">
-                {selectedCandidate.linkedin_url && (
-                  <a href={selectedCandidate.linkedin_url} target="_blank" rel="noopener noreferrer" 
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
-                    <Linkedin className="w-4 h-4" />
-                    LinkedIn
-                  </a>
-                )}
-                {selectedCandidate.github_url && (
-                  <a href={selectedCandidate.github_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
-                    <Github className="w-4 h-4" />
-                    GitHub
-                  </a>
-                )}
-                {selectedCandidate.facebook_url && (
-                  <a href={selectedCandidate.facebook_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
-                    <Facebook className="w-4 h-4" />
-                    Facebook
-                  </a>
-                )}
-                {selectedCandidate.instagram_url && (
-                  <a href={selectedCandidate.instagram_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100">
-                    <Instagram className="w-4 h-4" />
-                    Instagram
-                  </a>
-                )}
-              </div>
             </div>
 
-            {/* Skills */}
-            {selectedCandidate.skills && selectedCandidate.skills.length > 0 && (
+            {/* Description */}
+            {selectedJob.description && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Skills</h2>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCandidate.skills.map((skill, i) => (
-                    <span key={i} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Description</h2>
+                <div 
+                  className="text-gray-600 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: selectedJob.description }}
+                />
               </div>
             )}
 
-            {/* Notes */}
-            {selectedCandidate.notes && (
+            {/* Requirements */}
+            {selectedJob.requirements && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
-                <p className="text-gray-600 whitespace-pre-wrap">{selectedCandidate.notes}</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Requirements</h2>
+                <div 
+                  className="text-gray-600 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: selectedJob.requirements }}
+                />
               </div>
             )}
-
-            {/* Activity Timeline */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Activity Timeline</h2>
-                <button
-                  onClick={() => setShowLogActivityModal(true)}
-                  className="flex items-center gap-1 text-sm text-brand-accent hover:underline"
-                >
-                  <Plus className="w-4 h-4" />
-                  Log Activity
-                </button>
-              </div>
-              {activityLogs.length === 0 ? (
-                <div className="text-center py-6 text-gray-400">
-                  <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No activity logged yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {activityLogs.map((log) => (
-                    <div key={log.id} className="flex gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                        log.activity_type === 'claimed' ? 'bg-green-100 text-green-600' :
-                        log.activity_type === 'released' ? 'bg-red-100 text-red-600' :
-                        log.channel === 'email' ? 'bg-blue-100 text-blue-600' :
-                        log.channel === 'phone' ? 'bg-purple-100 text-purple-600' :
-                        log.channel === 'sms' ? 'bg-green-100 text-green-600' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                        {log.activity_type === 'claimed' ? <Lock className="w-4 h-4" /> :
-                         log.activity_type === 'released' ? <Unlock className="w-4 h-4" /> :
-                         log.channel === 'email' ? <Mail className="w-4 h-4" /> :
-                         log.channel === 'phone' ? <PhoneCall className="w-4 h-4" /> :
-                         log.channel === 'sms' ? <MessageSquare className="w-4 h-4" /> :
-                         log.activity_type === 'meeting' || log.activity_type === 'recruiter_interview' || log.activity_type === 'client_interview' ? <Calendar className="w-4 h-4" /> :
-                         <FileText className="w-4 h-4" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">
-                            {activityTypeLabels[log.activity_type] || log.activity_type}
-                          </span>
-                          {log.channel && log.channel !== 'system' && (
-                            <span className="text-xs text-gray-500">
-                              via {channelLabels[log.channel] || log.channel}
-                            </span>
-                          )}
-                          {log.direction && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              log.direction === 'inbound' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {log.direction}
-                            </span>
-                          )}
-                        </div>
-                        {log.notes && (
-                          <p className="text-sm text-gray-600 mt-1">{log.notes}</p>
-                        )}
-                        {log.duration_seconds && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Duration: {Math.floor(log.duration_seconds / 60)}m {log.duration_seconds % 60}s
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
-                          <span>{log.recruiter?.full_name || 'Unknown'}</span>
-                          <span>•</span>
-                          <span>{new Date(log.created_at).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Jobs Applied */}
+            {/* Candidates */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Jobs</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Candidates ({applications.length})</h2>
               {applications.length === 0 ? (
                 <div className="text-center py-6 text-gray-400">
-                  <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Not linked to any jobs</p>
-                  <button
-                    onClick={() => setShowAddToJobModal(true)}
-                    className="mt-3 text-sm text-brand-green hover:underline"
-                  >
-                    Add to a job
-                  </button>
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No candidates yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {applications.map((app) => (
-                    <div key={app.id} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="font-medium text-gray-900">{app.jobs.title}</div>
-                          {app.jobs.clients && (
-                            <div className="text-sm text-gray-500">{app.jobs.clients.company_name}</div>
-                          )}
-                          <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${stageColors[app.stage]}`}>
-                            {app.stage}
-                          </span>
-                        </div>
-                        {isOwner(selectedCandidate) && (
-                          <button
-                            onClick={() => handleRemoveFromJob(app.id)}
-                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                            title="Remove from job"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
+                    <div key={app.id} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <Link 
+                          href={`/dashboard/candidates?id=${app.candidates.id}`}
+                          className="font-medium text-gray-900 hover:text-brand-accent"
+                        >
+                          {app.candidates.first_name} {app.candidates.last_name}
+                        </Link>
+                        {getOwnershipBadge(app.candidates)}
                       </div>
+                      {app.candidates.current_title && (
+                        <div className="text-sm text-gray-500 mt-1">{app.candidates.current_title}</div>
+                      )}
+                      <span className={`inline-flex mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${stageColors[app.stage]}`}>
+                        {app.stage}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1390,380 +686,121 @@ export default function CandidatesPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Info</h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Source</span>
-                  <span className="text-gray-900">{selectedCandidate.source || '-'}</span>
+                  <span className="text-gray-500">Created</span>
+                  <span className="text-gray-900">{new Date(selectedJob.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Added</span>
-                  <span className="text-gray-900">{new Date(selectedCandidate.created_at).toLocaleDateString()}</span>
+                  <span className="text-gray-500">Status</span>
+                  <span className="text-gray-900 capitalize">{selectedJob.status.replace('_', ' ')}</span>
                 </div>
               </div>
-            </div>
-
-            {/* Files */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Files</h2>
-                <div className="flex gap-1">
-                  <label className="p-1.5 hover:bg-gray-100 rounded cursor-pointer" title="Upload Resume (converts to Word)">
-                    {uploadingResume ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-                    ) : (
-                      <FileText className="w-4 h-4 text-gray-500" />
-                    )}
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleUploadResumeToStorage}
-                      disabled={uploadingResume}
-                      className="hidden"
-                    />
-                  </label>
-                  <label className="p-1.5 hover:bg-gray-100 rounded cursor-pointer" title="Upload ID/Document">
-                    {uploadingFile ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-                    ) : (
-                      <Plus className="w-4 h-4 text-gray-500" />
-                    )}
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
-                      onChange={(e) => handleUploadFile(e, 'document')}
-                      disabled={uploadingFile}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-              {candidateFiles.length === 0 ? (
-                <div className="text-center py-6 text-gray-400">
-                  <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No files yet</p>
-                  <p className="text-xs mt-1">Upload a resume or document</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {candidateFiles.map((file) => {
-                    const FileIcon = getFileIcon(file.file_type, file.mime_type)
-                    return (
-                      <div key={file.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg group">
-                        <FileIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{file.file_name}</div>
-                          <div className="text-xs text-gray-500">
-                            {file.file_type} • {formatFileSize(file.file_size)}
-                          </div>
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleDownloadFile(file)}
-                            className="p-1 hover:bg-gray-200 rounded"
-                            title="Download"
-                          >
-                            <Download className="w-4 h-4 text-gray-500" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFile(file)}
-                            className="p-1 hover:bg-red-100 rounded"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </div>
 
             {/* Actions */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
               <div className="space-y-2">
-                <label className={`w-full flex items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg cursor-pointer ${parsingResume ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  {parsingResume ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Upload className="w-4 h-4" />
-                  )}
-                  {parsingResume ? 'Parsing...' : 'Upload Resume'}
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={handleResumeUploadForCandidate}
-                    disabled={parsingResume}
-                    className="hidden"
-                  />
-                </label>
-                <button 
-                  onClick={handleGenerateResume}
-                  disabled={generatingResume}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg ${generatingResume ? 'opacity-50 cursor-not-allowed' : ''}`}
+                <button
+                  onClick={() => handleDelete(selectedJob.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50 rounded-lg"
                 >
-                  {generatingResume ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <FileText className="w-4 h-4" />
-                  )}
-                  {generatingResume ? 'Generating...' : 'Generate Resume'}
+                  <Trash2 className="w-4 h-4" />
+                  Delete Job
                 </button>
-                {isAdmin && (
-                  <button
-                    onClick={() => handleDelete(selectedCandidate.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50 rounded-lg"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Candidate
-                  </button>
-                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Add to Job Modal */}
-        {showAddToJobModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-900">Add to Job</h2>
-                <button onClick={() => setShowAddToJobModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              <div className="p-6">
-                {jobs.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No open jobs available</p>
-                ) : (
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {jobs.map((job) => (
-                      <button
-                        key={job.id}
-                        onClick={() => handleAddToJob(job.id)}
-                        className="w-full p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg"
-                      >
-                        <div className="font-medium text-gray-900">{job.title}</div>
-                        {job.clients && (
-                          <div className="text-sm text-gray-500">{job.clients.company_name}</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Log Activity Modal */}
-        {showLogActivityModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-900">Log Activity</h2>
-                <button onClick={() => setShowLogActivityModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              <form onSubmit={handleLogActivity} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Activity Type *</label>
-                  <select
-                    required
-                    value={activityFormData.activity_type}
-                    onChange={(e) => setActivityFormData({ ...activityFormData, activity_type: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  >
-                    <option value="note">Note</option>
-                    <option value="message">Message</option>
-                    <option value="call">Phone Call</option>
-                    <option value="meeting">Meeting</option>
-                    <option value="recruiter_interview">Recruiter Interview</option>
-                    <option value="client_interview">Client Interview</option>
-                  </select>
-                </div>
-
-                {(activityFormData.activity_type === 'message' || activityFormData.activity_type === 'call') && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
-                      <select
-                        value={activityFormData.channel}
-                        onChange={(e) => setActivityFormData({ ...activityFormData, channel: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      >
-                        <option value="">Select channel...</option>
-                        <option value="email">Email</option>
-                        <option value="phone">Phone</option>
-                        <option value="sms">SMS</option>
-                        <option value="linkedin">LinkedIn</option>
-                        <option value="in_person">In Person</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Direction</label>
-                      <select
-                        value={activityFormData.direction}
-                        onChange={(e) => setActivityFormData({ ...activityFormData, direction: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      >
-                        <option value="">Select direction...</option>
-                        <option value="outbound">Outbound (You → Candidate)</option>
-                        <option value="inbound">Inbound (Candidate → You)</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {activityFormData.activity_type === 'call' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
-                    <input
-                      type="number"
-                      value={activityFormData.duration_seconds ? Math.floor(parseInt(activityFormData.duration_seconds) / 60) : ''}
-                      onChange={(e) => setActivityFormData({ ...activityFormData, duration_seconds: e.target.value ? String(parseInt(e.target.value) * 60) : '' })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      placeholder="e.g. 15"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea
-                    rows={3}
-                    value={activityFormData.notes}
-                    onChange={(e) => setActivityFormData({ ...activityFormData, notes: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    placeholder="Add details about this activity..."
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowLogActivityModal(false)}
-                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2.5 bg-brand-green text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Log Activity
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Add/Edit Modal - in Detail View */}
+        {/* Modal - in Detail View */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-6 border-b border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {editingCandidate ? 'Edit Candidate' : 'Add New Candidate'}
+                  {editingJob ? 'Edit Job' : 'Post New Job'}
                 </h2>
                 <button onClick={() => { setShowModal(false); resetForm() }} className="p-1 hover:bg-gray-100 rounded">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.first_name}
-                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.last_name}
-                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="e.g. Senior Software Engineer"
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                  <select
+                    value={formData.client_id}
+                    onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="">Select a client...</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>{client.company_name}</option>
+                    ))}
+                  </select>
                 </div>
 
-                <h3 className="font-medium text-gray-900 pt-2">Social Profiles</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn</label>
-                    <input
-                      type="text"
-                      value={formData.linkedin_url}
-                      onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      placeholder="https://linkedin.com/in/..."
-                    />
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={anonymizeJobDescription}
+                        disabled={rewritingJD || (!formData.description && !formData.requirements)}
+                        className="flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {rewritingJD ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                        {rewritingJD ? 'Anonymizing...' : 'Anonymize'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={generateJobDescription}
+                        disabled={generatingJD || !formData.title}
+                        className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {generatingJD ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                        {generatingJD ? 'Generating...' : 'Generate with AI'}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">GitHub</label>
-                    <input
-                      type="text"
-                      value={formData.github_url}
-                      onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      placeholder="https://github.com/..."
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
-                    <input
-                      type="text"
-                      value={formData.facebook_url}
-                      onChange={(e) => setFormData({ ...formData, facebook_url: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      placeholder="https://facebook.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
-                    <input
-                      type="text"
-                      value={formData.instagram_url}
-                      onChange={(e) => setFormData({ ...formData, instagram_url: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                      placeholder="https://instagram.com/..."
-                    />
-                  </div>
+                  <RichTextEditor
+                    key={`desc-${editingJob?.id || 'new'}`}
+                    value={formData.description}
+                    onChange={(value) => setFormData({ ...formData, description: value })}
+                    placeholder="Job description, responsibilities..."
+                  />
                 </div>
 
-                <h3 className="font-medium text-gray-900 pt-2">Location</h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Requirements</label>
+                  <RichTextEditor
+                    key={`req-${editingJob?.id || 'new'}`}
+                    value={formData.requirements}
+                    onChange={(value) => setFormData({ ...formData, requirements: value })}
+                    placeholder="Required qualifications, skills..."
+                  />
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                   <select
@@ -1776,6 +813,7 @@ export default function CandidatesPage() {
                     ))}
                   </select>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
@@ -1784,6 +822,7 @@ export default function CandidatesPage() {
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="e.g. Toronto"
                     />
                   </div>
                   <div>
@@ -1803,90 +842,95 @@ export default function CandidatesPage() {
                   </div>
                 </div>
 
-                <h3 className="font-medium text-gray-900 pt-2">Experience</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current Title</label>
-                    <input
-                      type="text"
-                      value={formData.current_title}
-                      onChange={(e) => setFormData({ ...formData, current_title: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current Company</label>
-                    <input
-                      type="text"
-                      value={formData.current_company}
-                      onChange={(e) => setFormData({ ...formData, current_company: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Years Experience</label>
-                    <input
-                      type="number"
-                      value={formData.years_experience}
-                      onChange={(e) => setFormData({ ...formData, years_experience: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location Type</label>
                     <select
-                      value={formData.source}
-                      onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                      value={formData.location_type}
+                      onChange={(e) => setFormData({ ...formData, location_type: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                     >
-                      <option value="">Select source...</option>
-                      <option value="LinkedIn">LinkedIn</option>
-                      <option value="Indeed">Indeed</option>
-                      <option value="Referral">Referral</option>
-                      <option value="Job Board">Job Board</option>
-                      <option value="Website">Website</option>
-                      <option value="Resume Upload">Resume Upload</option>
-                      <option value="Other">Other</option>
+                      <option value="onsite">On-site</option>
+                      <option value="remote">Remote</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employment Type</label>
+                    <select
+                      value={formData.employment_type}
+                      onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="permanent">Permanent</option>
+                      <option value="contract">Contract</option>
+                      <option value="contract_to_hire">Contract to Hire</option>
                     </select>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Skills</label>
-                  <input
-                    type="text"
-                    value={formData.skills}
-                    onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    placeholder="JavaScript, React, Node.js (comma separated)"
-                  />
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary Min <span className="text-red-500">*</span></label>
+                    <input
+                      type="number"
+                      required
+                      value={formData.salary_min}
+                      onChange={(e) => setFormData({ ...formData, salary_min: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="80000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary Max <span className="text-red-500">*</span></label>
+                    <input
+                      type="number"
+                      required
+                      value={formData.salary_max}
+                      onChange={(e) => setFormData({ ...formData, salary_max: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="120000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <select
+                      value={formData.salary_currency}
+                      onChange={(e) => setFormData({ ...formData, salary_currency: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="CAD">CAD</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea
-                    rows={3}
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="placed">Placed</option>
-                    <option value="do_not_contact">Do Not Contact</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fee Percentage</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={formData.fee_percent}
+                      onChange={(e) => setFormData({ ...formData, fee_percent: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      placeholder="20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="open">Open</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="filled">Filled</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">
@@ -1899,9 +943,9 @@ export default function CandidatesPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-brand-green text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex-1 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
                   >
-                    {editingCandidate ? 'Save Changes' : 'Add Candidate'}
+                    {editingJob ? 'Save Changes' : 'Post Job'}
                   </button>
                 </div>
               </form>
@@ -1915,49 +959,37 @@ export default function CandidatesPage() {
   // List View
   return (
     <div className="p-8">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Candidates</h1>
-          <p className="text-gray-500 mt-1">Manage your candidate pipeline</p>
+          <h1 className="text-3xl font-bold text-gray-900">Jobs</h1>
+          <p className="text-gray-500 mt-1">Manage your job postings</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/pipeline"
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-            Pipeline
-          </Link>
-          <label className={`flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${parsingResume ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            {parsingResume ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Upload className="w-5 h-5" />
-            )}
-            {parsingResume ? 'Parsing...' : 'Upload Resume'}
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={handleResumeUpload}
-              disabled={parsingResume}
-              className="hidden"
-            />
-          </label>
-          <button
-            onClick={() => { resetForm(); setShowModal(true) }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-green text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Add Candidate
-          </button>
-        </div>
+        <button
+          onClick={() => { resetForm(); setShowModal(true) }}
+          className="flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Post New Job
+        </button>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab('platform')}
+          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'platform'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Platform Jobs
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+            activeTab === 'platform' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {platformJobsCount}
+          </span>
+        </button>
         <button
           onClick={() => setActiveTab('mine')}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
@@ -1966,43 +998,26 @@ export default function CandidatesPage() {
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          My Candidates
+          My Jobs
           <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
             activeTab === 'mine' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
           }`}>
-            {myCandidatesCount}
+            {myJobsCount}
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('new')}
+          onClick={() => setActiveTab('closed')}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'new'
+            activeTab === 'closed'
               ? 'border-brand-accent text-brand-accent'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          Unclaimed
-          {unclaimedCandidatesCount > 0 && (
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-              activeTab === 'new' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-green-100 text-green-600'
-            }`}>
-              {unclaimedCandidatesCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'all'
-              ? 'border-brand-accent text-brand-accent'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          All Candidates
+          My Closed Jobs
           <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-            activeTab === 'all' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+            activeTab === 'closed' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
           }`}>
-            {candidates.length}
+            {myClosedJobsCount}
           </span>
         </button>
       </div>
@@ -2013,7 +1028,7 @@ export default function CandidatesPage() {
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search candidates..."
+            placeholder="Search jobs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent"
@@ -2021,307 +1036,212 @@ export default function CandidatesPage() {
         </div>
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
-      ) : filteredCandidates.length === 0 ? (
+      ) : filteredJobs.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-gray-400" />
+            <Briefcase className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {searchQuery ? 'No candidates found' : 'No candidates yet'}
+            {searchQuery ? 'No jobs found' : 
+              activeTab === 'platform' ? 'No platform jobs' :
+              activeTab === 'mine' ? 'No open jobs' : 'No closed jobs'}
           </h3>
           <p className="text-gray-500 mb-6 max-w-md mx-auto">
-            {searchQuery ? 'Try a different search term' : 'Add candidates to start building your talent pipeline.'}
+            {searchQuery 
+              ? 'Try a different search term' 
+              : activeTab === 'platform'
+                ? 'No open jobs from other recruiters at this time.'
+                : activeTab === 'mine' 
+                  ? 'Post a new job to start tracking candidates and placements.'
+                  : 'You have no closed or filled jobs yet.'}
           </p>
-          {!searchQuery && (
+          {!searchQuery && activeTab === 'mine' && (
             <button
               onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-green text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
             >
               <Plus className="w-5 h-5" />
-              Add Your First Candidate
+              Post Your First Job
             </button>
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="divide-y divide-gray-100">
-            {filteredCandidates.map((candidate) => {
-              const status = getOwnershipStatus(candidate)
-              const isExclusiveByOther = status === 'exclusive' && candidate.recruiter_id !== currentUserId
-              const isRestricted = isExclusiveByOther && !isAdmin
-              
-              return (
-              <div 
-                key={candidate.id} 
-                className={`flex items-center gap-4 px-4 py-3 transition-colors ${
-                  isRestricted 
-                    ? 'bg-gray-50 opacity-60 cursor-not-allowed' 
-                    : 'cursor-pointer hover:bg-gray-50 group'
-                }`}
-                onClick={() => !isRestricted && openDetailView(candidate)}
-              >
-                {/* Avatar */}
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
-                  isRestricted ? 'bg-gray-200 text-gray-500' : 'bg-brand-green/10 text-brand-green'
-                }`}>
-                  {candidate.first_name[0]}{candidate.last_name[0]}
-                </div>
-
-                {/* Name */}
-                <div className="w-36 flex-shrink-0">
-                  <h3 className={`font-medium truncate text-sm ${
-                    isRestricted ? 'text-gray-500' : 'text-gray-900 group-hover:text-brand-accent transition-colors'
-                  }`}>
-                    {candidate.first_name} {candidate.last_name}
-                  </h3>
-                </div>
-
-                {/* Title/Company */}
-                <div className="w-48 flex-shrink-0 hidden md:block">
-                  {candidate.current_title ? (
-                    <div className="text-sm text-gray-600 truncate">
-                      {candidate.current_title}
-                      {candidate.current_company && <span className="text-gray-400"> @ {candidate.current_company}</span>}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-400">—</span>
-                  )}
-                </div>
-
-                {/* Location */}
-                <div className="w-32 flex-shrink-0 hidden lg:block">
-                  {formatLocation(candidate.city, candidate.state, candidate.country) ? (
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{formatLocation(candidate.city, candidate.state, candidate.country)}</span>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-400">—</span>
-                  )}
-                </div>
-
-                {/* LinkedIn */}
-                <div className="w-8 flex-shrink-0 flex justify-center" onClick={(e) => e.stopPropagation()}>
-                  {candidate.linkedin_url ? (
-                    <a
-                      href={candidate.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        window.open(candidate.linkedin_url!, '_blank')
-                      }}
-                      className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                      title="View LinkedIn Profile"
-                    >
-                      <Linkedin className="w-4 h-4" />
-                    </a>
-                  ) : (
-                    <span className="p-1 text-gray-300">
-                      <Linkedin className="w-4 h-4" />
+        <div className="grid gap-4">
+          {filteredJobs.map((job) => (
+            <div 
+              key={job.id} 
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 cursor-pointer hover:border-brand-accent transition-colors"
+              onClick={() => openDetailView(job)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[job.status]}`}>
+                      {job.status.replace('_', ' ')}
                     </span>
-                  )}
-                </div>
-
-                {/* Status Badges */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[candidate.status]}`}>
-                    {candidate.status.replace('_', ' ')}
-                  </span>
-                  {(() => {
-                    const status = getOwnershipStatus(candidate)
-                    const colors = ownershipColors[status]
-                    const Icon = colors.icon
-                    return (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
-                        <Icon className="w-3 h-3" />
-                        {status === 'owned' ? (candidate.owned_by === currentUserId ? 'Mine' : 'Owned') : 
-                         status === 'exclusive' ? 'Exclusive' : 'Open'}
+                    {job.is_published && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-brand-green/10 text-brand-green">
+                        <Globe className="w-3 h-3" />
+                        Published
                       </span>
-                    )
-                  })()}
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                    {job.clients && (
+                      <div className="flex items-center gap-1">
+                        <Building2 className="w-4 h-4" />
+                        {job.clients.company_name}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {formatLocation(job.city, job.state, job.country, job.location_type)}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="w-4 h-4" />
+                      {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
+                    </div>
+                    {job.fee_percent && (
+                      <div className="text-brand-green font-medium">
+                        {job.fee_percent}% fee
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 text-xs text-gray-400">
+                    {job.employment_type.replace('_', ' ')} · Created {new Date(job.created_at).toLocaleDateString()}
+                  </div>
                 </div>
-
-                {/* Skills (hidden on small screens) */}
-                <div className="flex-1 hidden xl:flex items-center gap-1 overflow-hidden">
-                  {candidate.skills && candidate.skills.length > 0 ? (
-                    candidate.skills.slice(0, 2).map((skill, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full truncate">
-                        {skill}
-                      </span>
-                    ))
-                  ) : null}
-                </div>
-
-                {/* Menu */}
-                <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                  {/* Show menu for owners, admins, or open candidates (not for exclusive by others) */}
-                  {!isRestricted && (isOwner(candidate) || isAdmin || (status === 'open' && !candidate.owned_by)) && (
-                    <>
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setMenuOpen(menuOpen === job.id ? null : job.id)}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
+                  >
+                    <MoreVertical className="w-5 h-5 text-gray-400" />
+                  </button>
+                  {menuOpen === job.id && (
+                    <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
                       <button
-                        onClick={() => setMenuOpen(menuOpen === candidate.id ? null : candidate.id)}
-                        className="p-1.5 hover:bg-gray-100 rounded"
+                        onClick={() => openEditModal(job)}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        <MoreVertical className="w-4 h-4 text-gray-400" />
+                        <Pencil className="w-4 h-4" />
+                        Edit
                       </button>
-                      {menuOpen === candidate.id && (
-                        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
-                          {isOwner(candidate) && (
-                            <button
-                              onClick={() => openEditModal(candidate)}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            >
-                              <Pencil className="w-4 h-4" />
-                              Edit
-                            </button>
-                          )}
-                          {status === 'open' && !candidate.owned_by && !isOwner(candidate) && (
-                            <button
-                              onClick={() => { claimCandidate(candidate); setMenuOpen(null) }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-green hover:bg-gray-50"
-                            >
-                              <Lock className="w-4 h-4" />
-                              Claim
-                            </button>
-                          )}
-                          {isOwner(candidate) && (
-                            <button
-                              onClick={() => { releaseCandidate(candidate); setMenuOpen(null) }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-gray-50"
-                            >
-                              <Unlock className="w-4 h-4" />
-                              Release
-                            </button>
-                          )}
-                          {isAdmin && (
-                            <button
-                              onClick={() => handleDelete(candidate.id)}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </>
+                      <button
+                        onClick={() => togglePublish(job)}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        {job.is_published ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                        {job.is_published ? 'Unpublish' : 'Publish'}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(job.id)}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
-              )
-            })}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900">
-                {editingCandidate ? 'Edit Candidate' : 'Add New Candidate'}
+                {editingJob ? 'Edit Job' : 'Post New Job'}
               </h2>
               <button onClick={() => { setShowModal(false); resetForm() }} className="p-1 hover:bg-gray-100 rounded">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Job Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  placeholder="e.g. Senior Software Engineer"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                <select
+                  value={formData.client_id}
+                  onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                >
+                  <option value="">Select a client...</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>{client.company_name}</option>
+                  ))}
+                </select>
               </div>
 
-              <h3 className="font-medium text-gray-900 pt-2">Social Profiles</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn</label>
-                  <input
-                    type="text"
-                    value={formData.linkedin_url}
-                    onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    placeholder="https://linkedin.com/in/..."
-                  />
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={anonymizeJobDescription}
+                      disabled={rewritingJD || (!formData.description && !formData.requirements)}
+                      className="flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {rewritingJD ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      {rewritingJD ? 'Anonymizing...' : 'Anonymize'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={generateJobDescription}
+                      disabled={generatingJD || !formData.title}
+                      className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generatingJD ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4" />
+                      )}
+                      {generatingJD ? 'Generating...' : 'Generate with AI'}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">GitHub</label>
-                  <input
-                    type="text"
-                    value={formData.github_url}
-                    onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    placeholder="https://github.com/..."
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
-                  <input
-                    type="text"
-                    value={formData.facebook_url}
-                    onChange={(e) => setFormData({ ...formData, facebook_url: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    placeholder="https://facebook.com/..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
-                  <input
-                    type="text"
-                    value={formData.instagram_url}
-                    onChange={(e) => setFormData({ ...formData, instagram_url: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                    placeholder="https://instagram.com/..."
-                  />
-                </div>
+                <RichTextEditor
+                  key={`desc2-${editingJob?.id || 'new'}`}
+                  value={formData.description}
+                  onChange={(value) => setFormData({ ...formData, description: value })}
+                  placeholder="Job description, responsibilities..."
+                />
               </div>
 
-              <h3 className="font-medium text-gray-900 pt-2">Location</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Requirements</label>
+                <RichTextEditor
+                  key={`req2-${editingJob?.id || 'new'}`}
+                  value={formData.requirements}
+                  onChange={(value) => setFormData({ ...formData, requirements: value })}
+                  placeholder="Required qualifications, skills..."
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                 <select
@@ -2334,6 +1254,7 @@ export default function CandidatesPage() {
                   ))}
                 </select>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
@@ -2342,6 +1263,7 @@ export default function CandidatesPage() {
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="e.g. Toronto"
                   />
                 </div>
                 <div>
@@ -2361,89 +1283,95 @@ export default function CandidatesPage() {
                 </div>
               </div>
 
-              <h3 className="font-medium text-gray-900 pt-2">Experience</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Title</label>
-                  <input
-                    type="text"
-                    value={formData.current_title}
-                    onChange={(e) => setFormData({ ...formData, current_title: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Company</label>
-                  <input
-                    type="text"
-                    value={formData.current_company}
-                    onChange={(e) => setFormData({ ...formData, current_company: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Years Experience</label>
-                  <input
-                    type="number"
-                    value={formData.years_experience}
-                    onChange={(e) => setFormData({ ...formData, years_experience: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location Type</label>
                   <select
-                    value={formData.source}
-                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    value={formData.location_type}
+                    onChange={(e) => setFormData({ ...formData, location_type: e.target.value })}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
-                    <option value="">Select source...</option>
-                    <option value="LinkedIn">LinkedIn</option>
-                    <option value="Indeed">Indeed</option>
-                    <option value="Referral">Referral</option>
-                    <option value="Job Board">Job Board</option>
-                    <option value="Website">Website</option>
-                    <option value="Other">Other</option>
+                    <option value="onsite">On-site</option>
+                    <option value="remote">Remote</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Employment Type</label>
+                  <select
+                    value={formData.employment_type}
+                    onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="permanent">Permanent</option>
+                    <option value="contract">Contract</option>
+                    <option value="contract_to_hire">Contract to Hire</option>
                   </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Skills</label>
-                <input
-                  type="text"
-                  value={formData.skills}
-                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  placeholder="JavaScript, React, Node.js (comma separated)"
-                />
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Min <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.salary_min}
+                    onChange={(e) => setFormData({ ...formData, salary_min: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="80000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Max <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.salary_max}
+                    onChange={(e) => setFormData({ ...formData, salary_max: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="120000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                  <select
+                    value={formData.salary_currency}
+                    onChange={(e) => setFormData({ ...formData, salary_currency: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="CAD">CAD</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea
-                  rows={3}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="placed">Placed</option>
-                  <option value="do_not_contact">Do Not Contact</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fee Percentage</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formData.fee_percent}
+                    onChange={(e) => setFormData({ ...formData, fee_percent: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    placeholder="20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="open">Open</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="filled">Filled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -2456,9 +1384,9 @@ export default function CandidatesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-brand-green text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-blue transition-colors"
                 >
-                  {editingCandidate ? 'Save Changes' : 'Add Candidate'}
+                  {editingJob ? 'Save Changes' : 'Post Job'}
                 </button>
               </div>
             </form>
