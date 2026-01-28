@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   Plus, Search, Briefcase, MoreVertical, Pencil, Trash2, X, Building2, 
   MapPin, DollarSign, ArrowLeft, Users, Sparkles, Globe, EyeOff, Loader2,
-  Lock, Unlock, Clock, RefreshCw
+  Lock, Unlock, Clock, RefreshCw, User
 } from 'lucide-react'
 
 interface Client {
@@ -35,11 +35,22 @@ interface Application {
   candidates: Candidate
 }
 
+interface ClientContact {
+  id: string
+  client_id: string
+  name: string
+  title: string | null
+  email: string | null
+  phone: string | null
+}
+
 interface Job {
   id: string
   title: string
   client_id: string | null
   clients: Client | null
+  hiring_manager_id: string | null
+  hiring_manager?: ClientContact | null
   city: string | null
   state: string | null
   country: string | null
@@ -60,6 +71,7 @@ interface Job {
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [clientContacts, setClientContacts] = useState<ClientContact[]>([])
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -80,6 +92,7 @@ export default function JobsPage() {
   const [formData, setFormData] = useState({
     title: '',
     client_id: '',
+    hiring_manager_id: '',
     description: '',
     requirements: '',
     city: '',
@@ -125,6 +138,16 @@ export default function JobsPage() {
     }
   }, [formData.country])
 
+  // Fetch client contacts when client changes
+  useEffect(() => {
+    if (formData.client_id) {
+      fetchClientContacts(formData.client_id)
+    } else {
+      setClientContacts([])
+      setFormData(prev => ({ ...prev, hiring_manager_id: '' }))
+    }
+  }, [formData.client_id])
+
   useEffect(() => {
     if (selectedJob) {
       fetchApplicationsForJob(selectedJob.id)
@@ -134,7 +157,7 @@ export default function JobsPage() {
   async function fetchJobs() {
     const { data, error } = await supabase
       .from('jobs')
-      .select('*, clients(id, company_name), recruiter_id')
+      .select('*, clients(id, company_name), hiring_manager:client_contacts(id, name, title, email, phone), recruiter_id')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -156,6 +179,21 @@ export default function JobsPage() {
       console.error('Error fetching clients:', error)
     } else {
       setClients((data as unknown as Client[]) || [])
+    }
+  }
+
+  async function fetchClientContacts(clientId: string) {
+    const { data, error } = await supabase
+      .from('client_contacts')
+      .select('id, client_id, name, title, email, phone')
+      .eq('client_id', clientId)
+      .order('name')
+
+    if (error) {
+      console.error('Error fetching client contacts:', error)
+      setClientContacts([])
+    } else {
+      setClientContacts((data as unknown as ClientContact[]) || [])
     }
   }
 
@@ -305,6 +343,17 @@ export default function JobsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    // Validate client and hiring manager
+    if (!formData.client_id) {
+      alert('Please select a client')
+      return
+    }
+    
+    if (!formData.hiring_manager_id) {
+      alert('Please select a hiring manager. If no contacts exist for this client, add one first in the Clients page.')
+      return
+    }
+
     // Validate salary range is provided
     if (!formData.salary_min || !formData.salary_max) {
       alert('Salary range (min and max) is required for all jobs')
@@ -314,6 +363,7 @@ export default function JobsPage() {
     const jobData = {
       title: formData.title,
       client_id: formData.client_id || null,
+      hiring_manager_id: formData.hiring_manager_id || null,
       description: formData.description || null,
       requirements: formData.requirements || null,
       city: formData.city || null,
@@ -343,7 +393,8 @@ export default function JobsPage() {
         resetForm()
         fetchJobs()
         if (selectedJob?.id === editingJob.id) {
-          setSelectedJob({ ...selectedJob, ...jobData, clients: selectedJob.clients })
+          const updatedHiringManager = clientContacts.find(c => c.id === formData.hiring_manager_id)
+          setSelectedJob({ ...selectedJob, ...jobData, clients: selectedJob.clients, hiring_manager: updatedHiringManager || null })
         }
       }
     } else {
@@ -417,9 +468,14 @@ export default function JobsPage() {
 
   function openEditModal(job: Job) {
     setEditingJob(job)
+    // Fetch contacts for this job's client
+    if (job.client_id) {
+      fetchClientContacts(job.client_id)
+    }
     setFormData({
       title: job.title,
       client_id: job.client_id || '',
+      hiring_manager_id: job.hiring_manager_id || '',
       description: job.description || '',
       requirements: job.requirements || '',
       city: job.city || '',
@@ -441,6 +497,7 @@ export default function JobsPage() {
     setFormData({
       title: '',
       client_id: '',
+      hiring_manager_id: '',
       description: '',
       requirements: '',
       city: '',
@@ -454,6 +511,7 @@ export default function JobsPage() {
       fee_percent: '',
       status: 'open'
     })
+    setClientContacts([])
     setEditingJob(null)
   }
 
@@ -575,6 +633,15 @@ export default function JobsPage() {
                   </div>
                   {selectedJob.clients && (
                     <p className="text-lg text-gray-600">{selectedJob.clients.company_name}</p>
+                  )}
+                  {selectedJob.hiring_manager && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                      <User className="w-4 h-4" />
+                      <span>Hiring Manager: <span className="font-medium text-gray-700">{selectedJob.hiring_manager.name}</span></span>
+                      {selectedJob.hiring_manager.title && (
+                        <span className="text-gray-400">({selectedJob.hiring_manager.title})</span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -735,15 +802,34 @@ export default function JobsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
                   <select
+                    required
                     value={formData.client_id}
-                    onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, client_id: e.target.value, hiring_manager_id: '' })}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <option value="">Select a client...</option>
                     {clients.map((client) => (
                       <option key={client.id} value={client.id}>{client.company_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hiring Manager *</label>
+                  <select
+                    required
+                    value={formData.hiring_manager_id}
+                    onChange={(e) => setFormData({ ...formData, hiring_manager_id: e.target.value })}
+                    disabled={!formData.client_id}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">{formData.client_id ? (clientContacts.length === 0 ? 'No contacts - add in Clients page' : 'Select hiring manager...') : 'Select a client first...'}</option>
+                    {clientContacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name}{contact.title ? ` - ${contact.title}` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

@@ -68,6 +68,17 @@ interface Client {
   owner?: { full_name: string | null } | null
 }
 
+interface ClientContact {
+  id: string
+  client_id: string
+  name: string
+  title: string | null
+  email: string | null
+  phone: string | null
+  is_primary: boolean
+  notes: string | null
+}
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [jobs, setJobs] = useState<Job[]>([])
@@ -95,6 +106,15 @@ export default function ClientsPage() {
     notes: '',
     duration_seconds: '',
     call_answered: false
+  })
+  const [clientContacts, setClientContacts] = useState<ClientContact[]>([])
+  const [showAddContactModal, setShowAddContactModal] = useState(false)
+  const [contactFormData, setContactFormData] = useState({
+    name: '',
+    title: '',
+    email: '',
+    phone: '',
+    notes: ''
   })
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -145,6 +165,7 @@ export default function ClientsPage() {
       fetchJobsForClient(selectedClient.id)
       fetchClientAccess(selectedClient.id)
       fetchActivityLogs(selectedClient.id)
+      fetchClientContacts(selectedClient.id)
     }
   }, [selectedClient])
 
@@ -231,6 +252,63 @@ export default function ClientsPage() {
       console.error('Error fetching activity logs:', error)
     } else {
       setActivityLogs((data as unknown as ClientActivityLog[]) || [])
+    }
+  }
+
+  async function fetchClientContacts(clientId: string) {
+    const { data, error } = await supabase
+      .from('client_contacts')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('name')
+
+    if (error) {
+      console.error('Error fetching client contacts:', error)
+    } else {
+      setClientContacts((data as unknown as ClientContact[]) || [])
+    }
+  }
+
+  async function addClientContact() {
+    if (!selectedClient || !contactFormData.name) {
+      alert('Name is required')
+      return
+    }
+
+    const { error } = await supabase
+      .from('client_contacts')
+      .insert([{
+        client_id: selectedClient.id,
+        name: contactFormData.name,
+        title: contactFormData.title || null,
+        email: contactFormData.email || null,
+        phone: contactFormData.phone || null,
+        notes: contactFormData.notes || null
+      }])
+
+    if (error) {
+      console.error('Error adding contact:', error)
+      alert('Error adding contact')
+    } else {
+      setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
+      setShowAddContactModal(false)
+      fetchClientContacts(selectedClient.id)
+    }
+  }
+
+  async function deleteClientContact(contactId: string) {
+    if (!confirm('Are you sure you want to delete this contact?')) return
+
+    const { error } = await supabase
+      .from('client_contacts')
+      .delete()
+      .eq('id', contactId)
+
+    if (error) {
+      console.error('Error deleting contact:', error)
+      alert('Error deleting contact')
+    } else if (selectedClient) {
+      fetchClientContacts(selectedClient.id)
     }
   }
 
@@ -890,6 +968,60 @@ export default function ClientsPage() {
                 </div>
               </div>
             )}
+
+            {/* Client Contacts (Employees) */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Contacts ({clientContacts.length})</h2>
+                <button
+                  onClick={() => setShowAddContactModal(true)}
+                  className="flex items-center gap-1 text-sm text-brand-accent hover:text-brand-blue"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Contact
+                </button>
+              </div>
+              {clientContacts.length === 0 ? (
+                <div className="text-center py-6 text-gray-400">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No contacts added yet</p>
+                  <p className="text-xs mt-1">Add contacts to assign as hiring managers on jobs</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {clientContacts.map((contact) => (
+                    <div key={contact.id} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="font-medium text-gray-900">{contact.name}</div>
+                        {contact.title && (
+                          <div className="text-sm text-gray-500">{contact.title}</div>
+                        )}
+                        <div className="flex flex-wrap gap-3 mt-2">
+                          {contact.email && (
+                            <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-sm text-gray-600 hover:text-brand-blue">
+                              <Mail className="w-3 h-3" />
+                              {contact.email}
+                            </a>
+                          )}
+                          {contact.phone && (
+                            <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-sm text-gray-600 hover:text-brand-blue">
+                              <Phone className="w-3 h-3" />
+                              {contact.phone}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteClientContact(contact.id)}
+                        className="p-1 text-gray-400 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Notes */}
             {selectedClient.notes && (
@@ -1887,6 +2019,97 @@ export default function ClientsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddContactModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900">Add Contact</h2>
+              <button 
+                onClick={() => {
+                  setShowAddContactModal(false)
+                  setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={contactFormData.name}
+                  onChange={(e) => setContactFormData({ ...contactFormData, name: e.target.value })}
+                  placeholder="John Smith"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={contactFormData.title}
+                  onChange={(e) => setContactFormData({ ...contactFormData, title: e.target.value })}
+                  placeholder="VP of Engineering"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={contactFormData.email}
+                  onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                  placeholder="john@company.com"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={contactFormData.phone}
+                  onChange={(e) => setContactFormData({ ...contactFormData, phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={contactFormData.notes}
+                  onChange={(e) => setContactFormData({ ...contactFormData, notes: e.target.value })}
+                  placeholder="Additional notes..."
+                  rows={2}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent resize-none"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAddContactModal(false)
+                  setContactFormData({ name: '', title: '', email: '', phone: '', notes: '' })
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addClientContact}
+                disabled={!contactFormData.name}
+                className="flex-1 px-4 py-2.5 bg-brand-accent text-white font-medium rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
+              >
+                Add Contact
+              </button>
+            </div>
           </div>
         </div>
       )}
