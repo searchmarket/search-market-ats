@@ -29,6 +29,11 @@ export async function POST(request: NextRequest) {
     console.log('Subject:', subject)
     console.log('Reference URL:', referenceUrl)
 
+    // Corporate styling
+    const linkColor = '#4A5568' // Corporate greyish blue
+    const fontFamily = "Calibri, 'Segoe UI', Arial, sans-serif"
+    const fontSize = '14px' // 11pt equivalent for web
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -40,27 +45,27 @@ export async function POST(request: NextRequest) {
         to: to,
         subject: subject,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <p>Hi,</p>
+          <div style="font-family: ${fontFamily}; font-size: ${fontSize}; color: #333333; line-height: 1.5; max-width: 600px;">
+            <p style="margin: 0 0 16px 0;">Hi,</p>
             
-            <p>My name is ${recruiterName} and I'm a recruiter working with Search Market, a new AI powered talent finding platform. I was given your information as a reference for <strong>${candidateName}</strong>.</p>
+            <p style="margin: 0 0 16px 0;">My name is ${recruiterName} and I'm a recruiter working with Search Market, a new AI powered talent finding platform. I was given your information as a reference for <strong>${candidateName}</strong>.</p>
             
-            <p>I am wondering if you could take a moment to visit the following page and fill in the reference information.</p>
+            <p style="margin: 0 0 16px 0;">I am wondering if you could take a moment to visit the following page and fill in the reference information.</p>
             
-            <p style="margin: 30px 0;">
-              <a href="${referenceUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            <p style="margin: 24px 0;">
+              <a href="${referenceUrl}" style="background-color: ${linkColor}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-family: ${fontFamily}; font-size: ${fontSize};">
                 Complete Reference Check
               </a>
             </p>
             
-            <p>Or copy this link: <a href="${referenceUrl}">${referenceUrl}</a></p>
+            <p style="margin: 0 0 16px 0;">Or copy this link: <a href="${referenceUrl}" style="color: ${linkColor};">${referenceUrl}</a></p>
             
-            <p>Thanks very much in advance!</p>
+            <p style="margin: 0 0 16px 0;">Thanks very much in advance!</p>
             
-            <p style="margin-top: 30px;">
+            <p style="margin: 24px 0 0 0;">
               Craig Ferguson<br>
-              <a href="https://Search.Market">https://Search.Market</a><br>
-              <a href="mailto:craig.ferguson@search.market">craig.ferguson@search.market</a>
+              <a href="https://Search.Market" style="color: ${linkColor};">https://Search.Market</a><br>
+              <a href="mailto:craig.ferguson@search.market" style="color: ${linkColor};">craig.ferguson@search.market</a>
             </p>
           </div>
         `,
