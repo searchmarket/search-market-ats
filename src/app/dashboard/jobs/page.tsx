@@ -457,11 +457,8 @@ export default function JobsPage() {
     setEditingJob(null)
   }
 
-  // Only show open jobs, filtered by tab
+  // Filter jobs based on tab and search
   const filteredJobs = jobs.filter(job => {
-    // Only show open jobs
-    if (job.status !== 'open') return false
-    
     // Search filter
     const matchesSearch = !searchQuery ||
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
