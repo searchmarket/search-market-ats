@@ -207,6 +207,8 @@ export default function ReferencesPage() {
     }
     
     // Try to send email via API
+    let emailSent = false
+    let emailError = ''
     try {
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -221,11 +223,15 @@ export default function ReferencesPage() {
       })
       
       const result = await response.json()
-      if (!result.success) {
-        console.warn('Email not sent:', result.error)
+      if (result.success && result.messageId) {
+        emailSent = true
+      } else {
+        emailError = result.error || 'Unknown error'
+        console.warn('Email not sent:', result)
       }
     } catch (err) {
-      console.warn('Email API not available')
+      emailError = 'API not available'
+      console.warn('Email API error:', err)
     }
     
     // Reset form and refresh
@@ -240,8 +246,12 @@ export default function ReferencesPage() {
     fetchData()
     setSending(false)
     
-    // Show the reference link to copy
-    const copyLink = confirm(`Reference request created!\n\nReference link:\n${referenceUrl}\n\nClick OK to copy the link to clipboard.`)
+    // Show the reference link with email status
+    const emailStatus = emailSent 
+      ? '✅ Email sent successfully!' 
+      : `⚠️ Email not sent: ${emailError}\n\nYou can manually share the link below.`
+    
+    const copyLink = confirm(`Reference request created!\n\n${emailStatus}\n\nReference link:\n${referenceUrl}\n\nClick OK to copy the link to clipboard.`)
     if (copyLink) {
       navigator.clipboard.writeText(referenceUrl)
     }
