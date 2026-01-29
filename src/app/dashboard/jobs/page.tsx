@@ -90,6 +90,11 @@ export default function JobsPage() {
   const [showCloseJobModal, setShowCloseJobModal] = useState(false)
   const [closeJobStatus, setCloseJobStatus] = useState('filled')
   const [closingJob, setClosingJob] = useState(false)
+  const [placementData, setPlacementData] = useState({
+    candidate_id: '',
+    start_date: '',
+    starting_salary: ''
+  })
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -467,76 +472,113 @@ export default function JobsPage() {
     }
   }
 
-  function hasHiredCandidates(jobId: string): boolean {
-    return applications.some(app => app.job_id === jobId && app.stage === 'hired')
+  function getCandidatesInPipeline(jobId: string): Application[] {
+    return applications.filter(app => app.job_id === jobId)
   }
 
   function openCloseJobModal() {
     if (!selectedJob) return
     
-    // Check if there's a hired candidate
-    if (hasHiredCandidates(selectedJob.id)) {
-      // Auto-close with filled status
-      closeJob('filled')
-    } else {
-      // Show modal to select status
-      setCloseJobStatus('filled')
-      setShowCloseJobModal(true)
-    }
+    // Reset placement data and show modal
+    setPlacementData({
+      candidate_id: '',
+      start_date: '',
+      starting_salary: ''
+    })
+    setCloseJobStatus('filled')
+    setShowCloseJobModal(true)
   }
 
-  async function closeJob(status: string) {
+  async function closeJob() {
     if (!selectedJob || !currentUserId) return
+    
+    // If status is filled, validate placement data
+    if (closeJobStatus === 'filled') {
+      if (!placementData.candidate_id) {
+        alert('Please select a candidate')
+        return
+      }
+      if (!placementData.start_date) {
+        alert('Please enter a start date')
+        return
+      }
+      if (!placementData.starting_salary) {
+        alert('Please enter a starting salary')
+        return
+      }
+    }
     
     setClosingJob(true)
     
-    const { error } = await supabase
-      .from('jobs')
-      .update({ 
-        status: status,
-        is_published: false 
-      })
-      .eq('id', selectedJob.id)
+    try {
+      // 1. Update job status
+      const { error } = await supabase
+        .from('jobs')
+        .update({ 
+          status: closeJobStatus,
+          is_published: false 
+        })
+        .eq('id', selectedJob.id)
 
-    if (error) {
-      console.error('Error closing job:', error)
-      alert('Error closing job')
-    } else {
-      // If status is filled and there's a hired candidate, mark them as placed
-      if (status === 'filled') {
-        const hiredApps = applications.filter(app => app.job_id === selectedJob.id && app.stage === 'hired')
-        for (const app of hiredApps) {
-          // Update candidate status to placed
-          await supabase
-            .from('candidates')
-            .update({ 
-              status: 'placed',
-              placed_at: new Date().toISOString()
-            })
-            .eq('id', app.candidate_id)
-          
-          // Log placement activity
-          const jobTitle = selectedJob.title || 'Unknown Position'
-          const clientName = selectedJob.clients?.company_name || 'Unknown Company'
-          const recruiterName = currentUserName || 'Unknown'
-          
-          await supabase.from('activity_logs').insert([{
-            candidate_id: app.candidate_id,
-            recruiter_id: currentUserId,
-            activity_type: 'placement',
-            notes: `Placed by ${recruiterName} as a ${jobTitle} to ${clientName}`,
-            metadata: {
-              job_id: selectedJob.id,
-              job_title: jobTitle,
-              client_name: clientName
-            }
-          }])
-        }
+      if (error) {
+        console.error('Error closing job:', error)
+        alert('Error closing job')
+        setClosingJob(false)
+        return
+      }
+      
+      // 2. If status is filled, process the placement
+      if (closeJobStatus === 'filled' && placementData.candidate_id) {
+        // Update application to hired stage with salary/date
+        await supabase
+          .from('applications')
+          .update({ 
+            stage: 'hired',
+            updated_at: new Date().toISOString(),
+            starting_salary: parseFloat(placementData.starting_salary),
+            start_date: placementData.start_date
+          })
+          .eq('job_id', selectedJob.id)
+          .eq('candidate_id', placementData.candidate_id)
+        
+        // Update candidate status to placed
+        await supabase
+          .from('candidates')
+          .update({ 
+            status: 'placed',
+            placed_at: new Date().toISOString()
+          })
+          .eq('id', placementData.candidate_id)
+        
+        // Log placement activity
+        const jobTitle = selectedJob.title || 'Unknown Position'
+        const clientName = selectedJob.clients?.company_name || 'Unknown Company'
+        const recruiterName = currentUserName || 'Unknown'
+        
+        await supabase.from('activity_logs').insert([{
+          candidate_id: placementData.candidate_id,
+          recruiter_id: currentUserId,
+          activity_type: 'placement',
+          notes: `Placed by ${recruiterName} as a ${jobTitle} to ${clientName}`,
+          metadata: {
+            job_id: selectedJob.id,
+            job_title: jobTitle,
+            client_name: clientName,
+            starting_salary: parseFloat(placementData.starting_salary),
+            start_date: placementData.start_date
+          }
+        }])
       }
       
       fetchJobs()
-      setSelectedJob({ ...selectedJob, status: status, is_published: false })
+      fetchApplicationsForJob(selectedJob.id)
+      setSelectedJob({ ...selectedJob, status: closeJobStatus, is_published: false })
       setShowCloseJobModal(false)
+      setPlacementData({ candidate_id: '', start_date: '', starting_salary: '' })
+      
+    } catch (err) {
+      console.error('Error closing job:', err)
+      alert('Error closing job')
     }
     
     setClosingJob(false)
@@ -1601,15 +1643,17 @@ export default function JobsPage() {
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-            <div className="p-6">
-              <p className="text-gray-600 mb-4">
-                Select the status to close this job with:
-              </p>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
                 <select
                   value={closeJobStatus}
-                  onChange={(e) => setCloseJobStatus(e.target.value)}
+                  onChange={(e) => {
+                    setCloseJobStatus(e.target.value)
+                    if (e.target.value !== 'filled') {
+                      setPlacementData({ candidate_id: '', start_date: '', starting_salary: '' })
+                    }
+                  }}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
                 >
                   <option value="filled">Filled</option>
@@ -1617,7 +1661,60 @@ export default function JobsPage() {
                   <option value="on_hold">On Hold</option>
                 </select>
               </div>
-              <div className="flex gap-3">
+
+              {closeJobStatus === 'filled' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Candidate *</label>
+                    <select
+                      value={placementData.candidate_id}
+                      onChange={(e) => setPlacementData({ ...placementData, candidate_id: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      <option value="">
+                        {getCandidatesInPipeline(selectedJob.id).length === 0 
+                          ? 'No candidates in pipeline' 
+                          : 'Select candidate...'}
+                      </option>
+                      {getCandidatesInPipeline(selectedJob.id).map((app) => (
+                        <option key={app.id} value={app.candidate_id}>
+                          {app.candidates.first_name} {app.candidates.last_name}
+                          {app.candidates.current_title ? ` - ${app.candidates.current_title}` : ''}
+                          {` (${app.stage})`}
+                        </option>
+                      ))}
+                    </select>
+                    {getCandidatesInPipeline(selectedJob.id).length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Add candidates to the pipeline before closing as filled
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                    <input
+                      type="date"
+                      value={placementData.start_date}
+                      onChange={(e) => setPlacementData({ ...placementData, start_date: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Starting Salary *</label>
+                    <input
+                      type="number"
+                      value={placementData.starting_salary}
+                      onChange={(e) => setPlacementData({ ...placementData, starting_salary: e.target.value })}
+                      placeholder="85000"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowCloseJobModal(false)}
                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
@@ -1625,8 +1722,8 @@ export default function JobsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => closeJob(closeJobStatus)}
-                  disabled={closingJob}
+                  onClick={closeJob}
+                  disabled={closingJob || (closeJobStatus === 'filled' && (!placementData.candidate_id || !placementData.start_date || !placementData.starting_salary))}
                   className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
                 >
                   {closingJob ? 'Closing...' : 'Close Job'}
