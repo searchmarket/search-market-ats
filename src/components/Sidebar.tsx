@@ -9,7 +9,8 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
-  Mail
+  Mail,
+  Kanban
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -18,6 +19,7 @@ const navItems: { label: string; href: string; icon: any }[] = [
   { label: 'Jobs', href: '/dashboard/jobs', icon: Briefcase },
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
+  { label: 'Smart Pipeline', href: '/dashboard/pipeline', icon: Kanban },
   { label: 'Campaigns', href: '/dashboard/campaigns', icon: Mail },
 ]
 
