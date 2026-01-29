@@ -108,6 +108,18 @@ export default function PublicReferenceFormPage() {
         return
       }
       
+      // Send thank you email
+      try {
+        await fetch('/api/reference-thankyou', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        })
+      } catch (emailError) {
+        console.error('Error sending thank you email:', emailError)
+        // Don't block submission if email fails
+      }
+      
       setSubmitted(true)
       
     } catch (err) {
