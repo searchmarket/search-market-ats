@@ -9,7 +9,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
-  Mail,
+  Megaphone,
   Kanban
 } from 'lucide-react'
 import { useState } from 'react'
@@ -20,7 +20,7 @@ const navItems: { label: string; href: string; icon: any }[] = [
   { label: 'Candidates', href: '/dashboard/candidates', icon: Users },
   { label: 'Clients', href: '/dashboard/clients', icon: Building2 },
   { label: 'Smart Pipeline', href: '/dashboard/pipeline', icon: Kanban },
-  { label: 'Campaigns', href: '/dashboard/campaigns', icon: Mail },
+  { label: 'Campaigns', href: '/dashboard/campaigns', icon: Megaphone },
 ]
 
 export default function Sidebar() {
