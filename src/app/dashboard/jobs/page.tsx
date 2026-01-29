@@ -67,6 +67,8 @@ interface Job {
   is_published: boolean
   created_at: string
   recruiter_id: string
+  agency_id: string | null
+  visibility: 'platform' | 'agency_only'
 }
 
 export default function JobsPage() {
@@ -76,7 +78,7 @@ export default function JobsPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'platform' | 'mine' | 'closed'>('platform')
+  const [activeTab, setActiveTab] = useState<'agency' | 'platform' | 'mine' | 'closed'>('platform')
   const [showModal, setShowModal] = useState(false)
   const [showDetailView, setShowDetailView] = useState(false)
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
@@ -86,6 +88,7 @@ export default function JobsPage() {
   const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserName, setCurrentUserName] = useState<string>('')
+  const [currentUserAgencyId, setCurrentUserAgencyId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [showCloseJobModal, setShowCloseJobModal] = useState(false)
   const [closeJobStatus, setCloseJobStatus] = useState('filled')
@@ -114,7 +117,8 @@ export default function JobsPage() {
     salary_max: '',
     salary_currency: 'CAD',
     fee_percent: '',
-    status: 'open'
+    status: 'open',
+    visibility: 'platform' as 'platform' | 'agency_only'
   })
 
   const availableProvinces = provinces[formData.country] || []
@@ -212,10 +216,10 @@ export default function JobsPage() {
     if (user) {
       setCurrentUserId(user.id)
       
-      // Check if user is admin and get name
+      // Check if user is admin, get name, and get agency_id
       const { data: recruiter } = await supabase
         .from('recruiters')
-        .select('is_admin, full_name')
+        .select('is_admin, full_name, agency_id')
         .eq('id', user.id)
         .single()
       
@@ -224,6 +228,11 @@ export default function JobsPage() {
       }
       if (recruiter?.full_name) {
         setCurrentUserName(recruiter.full_name)
+      }
+      if (recruiter?.agency_id) {
+        setCurrentUserAgencyId(recruiter.agency_id)
+        // Set default tab to agency if user is part of an agency
+        setActiveTab('agency')
       }
     }
   }
@@ -388,7 +397,8 @@ export default function JobsPage() {
       salary_max: parseFloat(formData.salary_max),
       salary_currency: formData.salary_currency,
       fee_percent: formData.fee_percent ? parseFloat(formData.fee_percent) : null,
-      status: formData.status
+      status: formData.status,
+      visibility: formData.visibility
     }
 
     if (editingJob) {
@@ -413,7 +423,12 @@ export default function JobsPage() {
     } else {
       const { error } = await supabase
         .from('jobs')
-        .insert([{ ...jobData, recruiter_id: user.id, is_published: false }])
+        .insert([{ 
+          ...jobData, 
+          recruiter_id: user.id, 
+          is_published: false,
+          agency_id: currentUserAgencyId || null
+        }])
 
       if (error) {
         console.error('Error creating job:', error)
@@ -606,7 +621,9 @@ export default function JobsPage() {
         fee_percent: job.fee_percent,
         status: 'open',
         is_published: false,
-        recruiter_id: currentUserId
+        recruiter_id: currentUserId,
+        agency_id: currentUserAgencyId || null,
+        visibility: currentUserAgencyId ? 'agency_only' : 'platform'
       }])
       .select()
       .single()
@@ -651,7 +668,8 @@ export default function JobsPage() {
       salary_max: job.salary_max?.toString() || '',
       salary_currency: job.salary_currency,
       fee_percent: job.fee_percent?.toString() || '',
-      status: job.status
+      status: job.status,
+      visibility: job.visibility || 'platform'
     })
     setShowModal(true)
     setMenuOpen(null)
@@ -673,7 +691,8 @@ export default function JobsPage() {
       salary_max: '',
       salary_currency: 'CAD',
       fee_percent: '',
-      status: 'open'
+      status: 'open',
+      visibility: currentUserAgencyId ? 'agency_only' : 'platform'
     })
     setClientContacts([])
     setEditingJob(null)
@@ -691,9 +710,16 @@ export default function JobsPage() {
     // Tab filter - wait for currentUserId to be loaded
     if (!currentUserId) return true // Show all while loading
     
-    if (activeTab === 'platform') {
-      // Platform Jobs: all open jobs from OTHER recruiters
-      return job.recruiter_id !== currentUserId && job.status === 'open'
+    if (activeTab === 'agency') {
+      // Agency Jobs: all open jobs within user's agency
+      return currentUserAgencyId && job.agency_id === currentUserAgencyId && job.status === 'open'
+    } else if (activeTab === 'platform') {
+      // Platform Jobs: all open jobs visible to platform (not agency-only) from OTHER recruiters
+      return job.recruiter_id !== currentUserId && 
+             job.status === 'open' && 
+             job.visibility === 'platform' &&
+             // Exclude agency-only jobs from other agencies
+             (job.agency_id === currentUserAgencyId || job.visibility !== 'agency_only')
     } else if (activeTab === 'mine') {
       // My Jobs: only open jobs I created
       return job.recruiter_id === currentUserId && job.status === 'open'
@@ -705,8 +731,14 @@ export default function JobsPage() {
   })
 
   // Counts for tabs
+  const agencyJobsCount = currentUserAgencyId ? jobs.filter(j => 
+    j.status === 'open' && j.agency_id === currentUserAgencyId
+  ).length : 0
+
   const platformJobsCount = jobs.filter(j => 
-    j.status === 'open' && j.recruiter_id !== currentUserId
+    j.status === 'open' && 
+    j.recruiter_id !== currentUserId && 
+    j.visibility === 'platform'
   ).length
   
   const myJobsCount = jobs.filter(j => 
@@ -798,6 +830,12 @@ export default function JobsPage() {
                       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-brand-green/10 text-brand-green">
                         <Globe className="w-3 h-3" />
                         Published
+                      </span>
+                    )}
+                    {selectedJob.visibility === 'agency_only' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                        <Lock className="w-3 h-3" />
+                        Agency Only
                       </span>
                     )}
                   </div>
@@ -1212,6 +1250,39 @@ export default function JobsPage() {
                   </div>
                 </div>
 
+                {/* Visibility - only shown if user is part of an agency */}
+                {currentUserAgencyId && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label className="block text-sm font-medium text-blue-900 mb-2">Job Visibility</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="visibility"
+                          value="agency_only"
+                          checked={formData.visibility === 'agency_only'}
+                          onChange={(e) => setFormData({ ...formData, visibility: e.target.value as 'platform' | 'agency_only' })}
+                          className="w-4 h-4 text-brand-accent"
+                        />
+                        <span className="text-sm text-gray-700">Agency Only</span>
+                        <span className="text-xs text-gray-500">(Visible only to agency members)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="visibility"
+                          value="platform"
+                          checked={formData.visibility === 'platform'}
+                          onChange={(e) => setFormData({ ...formData, visibility: e.target.value as 'platform' | 'agency_only' })}
+                          className="w-4 h-4 text-brand-accent"
+                        />
+                        <span className="text-sm text-gray-700">Platform</span>
+                        <span className="text-xs text-gray-500">(Visible to all recruiters)</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
@@ -1361,6 +1432,24 @@ export default function JobsPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
+        {/* Agency Jobs tab - only shown if user is part of an agency */}
+        {currentUserAgencyId && (
+          <button
+            onClick={() => setActiveTab('agency')}
+            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'agency'
+                ? 'border-brand-accent text-brand-accent'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Agency Jobs
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+              activeTab === 'agency' ? 'bg-brand-accent/10 text-brand-accent' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {agencyJobsCount}
+            </span>
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('platform')}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
@@ -1431,17 +1520,20 @@ export default function JobsPage() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
             {searchQuery ? 'No jobs found' : 
+              activeTab === 'agency' ? 'No agency jobs' :
               activeTab === 'platform' ? 'No platform jobs' :
               activeTab === 'mine' ? 'No open jobs' : 'No closed jobs'}
           </h3>
           <p className="text-gray-500 mb-6 max-w-md mx-auto">
             {searchQuery 
               ? 'Try a different search term' 
-              : activeTab === 'platform'
-                ? 'No open jobs from other recruiters at this time.'
-                : activeTab === 'mine' 
-                  ? 'Post a new job to start tracking candidates and placements.'
-                  : 'You have no closed or filled jobs yet.'}
+              : activeTab === 'agency'
+                ? 'No open jobs from your agency at this time.'
+                : activeTab === 'platform'
+                  ? 'No open jobs from other recruiters at this time.'
+                  : activeTab === 'mine' 
+                    ? 'Post a new job to start tracking candidates and placements.'
+                    : 'You have no closed or filled jobs yet.'}
           </p>
           {!searchQuery && activeTab === 'mine' && (
             <button
@@ -1478,6 +1570,12 @@ export default function JobsPage() {
                       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-brand-green/10 text-brand-green">
                         <Globe className="w-3 h-3" />
                         Published
+                      </span>
+                    )}
+                    {job.visibility === 'agency_only' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+                        <Lock className="w-3 h-3" />
+                        Agency Only
                       </span>
                     )}
                   </div>
@@ -1784,6 +1882,39 @@ export default function JobsPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Visibility - only shown if user is part of an agency */}
+              {currentUserAgencyId && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-medium text-blue-900 mb-2">Job Visibility</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="visibility_modal"
+                        value="agency_only"
+                        checked={formData.visibility === 'agency_only'}
+                        onChange={(e) => setFormData({ ...formData, visibility: e.target.value as 'platform' | 'agency_only' })}
+                        className="w-4 h-4 text-brand-accent"
+                      />
+                      <span className="text-sm text-gray-700">Agency Only</span>
+                      <span className="text-xs text-gray-500">(Visible only to agency members)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="visibility_modal"
+                        value="platform"
+                        checked={formData.visibility === 'platform'}
+                        onChange={(e) => setFormData({ ...formData, visibility: e.target.value as 'platform' | 'agency_only' })}
+                        className="w-4 h-4 text-brand-accent"
+                      />
+                      <span className="text-sm text-gray-700">Platform</span>
+                      <span className="text-xs text-gray-500">(Visible to all recruiters)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
