@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { to, referenceName, candidateName, recruiterName, referenceUrl, isReminder } = body
+    const { to, referenceName, candidateName, recruiterName, recruiterEmail, recruiterSlug, referenceUrl, isReminder } = body
 
     const apiKey = process.env.RESEND_API_KEY
 
@@ -30,12 +30,17 @@ export async function POST(request: NextRequest) {
     console.log('Reference URL:', referenceUrl)
 
     // Corporate styling
-    const linkColor = '#4A5568' // Corporate greyish blue
+    const linkColor = '#0369a1' // Professional teal-blue - noticeable but not offensive
     const fontFamily = "Calibri, 'Segoe UI', Arial, sans-serif"
     const fontSize = '14px' // 11pt equivalent for web
 
     // Get reference first name
     const referenceFirstName = referenceName?.split(' ')[0] || 'there'
+    
+    // Build recruiter's Search.Market page URL
+    const recruiterPageUrl = recruiterSlug 
+      ? `https://jobs.search.market/r/${recruiterSlug}` 
+      : 'https://search.market'
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -65,10 +70,7 @@ export async function POST(request: NextRequest) {
             
             <p style="margin: 0 0 16px 0;">Thanks very much in advance!</p>
             
-            <p style="margin: 24px 0 0 0;">
-              ${recruiterName}<br>
-              <a href="https://Search.Market" style="color: ${linkColor};">https://Search.Market</a>
-            </p>
+            <p style="margin: 24px 0 0 0; line-height: 1.4;">${recruiterName}<br><a href="${recruiterPageUrl}" style="color: ${linkColor};">Search.Market</a><br><a href="mailto:${recruiterEmail}" style="color: ${linkColor};">${recruiterEmail}</a></p>
           </div>
         `,
       }),

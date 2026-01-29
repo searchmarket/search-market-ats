@@ -101,6 +101,9 @@ export async function POST(request: NextRequest) {
     // Build email content based on claimed status
     let emailHtml: string
     let subject = 'A big thanks from Search.Market'
+    
+    // Professional teal-blue link color - noticeable but not offensive
+    const linkColor = '#0369a1'
 
     if (isClaimed) {
       // Simple thank you for claimed contacts/candidates
@@ -115,15 +118,7 @@ export async function POST(request: NextRequest) {
           <p style="color: #374151; margin-bottom: 8px;">
             Best Regards,
           </p>
-          <p style="color: #374151; margin-bottom: 8px;">
-            <strong>${recruiterName}</strong>
-          </p>
-          <p style="margin-bottom: 4px;">
-            <a href="https://search.market" style="color: #4a6785; text-decoration: none;">https://Search.Market</a>
-          </p>
-          <p style="color: #6b7280;">
-            ${recruiterEmailAddress}
-          </p>
+          <p style="color: #374151; line-height: 1.4; margin: 0;">${recruiterName}<br><a href="${recruiterPageUrl}" style="color: ${linkColor};">Search.Market</a><br><a href="mailto:${recruiterEmailAddress}" style="color: ${linkColor};">${recruiterEmailAddress}</a></p>
         </div>
       `
     } else {
@@ -134,20 +129,12 @@ export async function POST(request: NextRequest) {
             Hi ${referenceFirstName},
           </p>
           <p style="color: #374151; margin-bottom: 20px;">
-            Thanks again for taking time to fill in ${candidateFirstName}'s reference form! If you need help hiring or you ever want to start looking for new job opportunities, simply visit my <a href="${recruiterPageUrl}" style="color: #4a6785; text-decoration: none;">Search.Market</a> page.
+            Thanks again for taking time to fill in ${candidateFirstName}'s reference form! If you need help hiring or you ever want to start looking for new job opportunities, simply visit my <a href="${recruiterPageUrl}" style="color: ${linkColor};">Search.Market</a> page.
           </p>
           <p style="color: #374151; margin-bottom: 20px;">
-            <a href="https://search.market" style="color: #4a6785; text-decoration: none;">Search.Market</a> connects the highest caliber recruiters to collaborate on filling your jobs.
+            <a href="https://search.market" style="color: ${linkColor};">Search.Market</a> connects the highest caliber recruiters to collaborate on filling your jobs.
           </p>
-          <p style="color: #374151; margin-bottom: 8px;">
-            <strong>${recruiterName}</strong>
-          </p>
-          <p style="margin-bottom: 4px;">
-            <a href="https://search.market" style="color: #4a6785; text-decoration: none;">https://Search.Market</a>
-          </p>
-          <p style="color: #6b7280;">
-            ${recruiterEmailAddress}
-          </p>
+          <p style="color: #374151; line-height: 1.4; margin: 0;">${recruiterName}<br><a href="${recruiterPageUrl}" style="color: ${linkColor};">Search.Market</a><br><a href="mailto:${recruiterEmailAddress}" style="color: ${linkColor};">${recruiterEmailAddress}</a></p>
         </div>
       `
     }

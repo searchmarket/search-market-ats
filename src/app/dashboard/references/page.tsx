@@ -22,6 +22,7 @@ interface Recruiter {
   id: string
   full_name: string | null
   email: string
+  slug: string | null
   is_admin?: boolean
 }
 
@@ -102,7 +103,7 @@ export default function ReferencesPage() {
     if (user) {
       const { data: recruiterData } = await supabase
         .from('recruiters')
-        .select('id, full_name, email, is_admin')
+        .select('id, full_name, email, slug, is_admin')
         .eq('id', user.id)
         .single()
       
@@ -200,6 +201,8 @@ export default function ReferencesPage() {
           referenceName: ref.reference_name,
           candidateName: `${candidate.first_name} ${candidate.last_name}`,
           recruiterName: recruiter.full_name || 'A recruiter',
+          recruiterEmail: recruiter.email,
+          recruiterSlug: recruiter.slug,
           referenceUrl: referenceUrl,
           isReminder: true
         })
@@ -344,6 +347,8 @@ export default function ReferencesPage() {
           referenceName: formData.reference_name,
           candidateName: `${candidate.first_name} ${candidate.last_name}`,
           recruiterName: recruiter.full_name || 'A recruiter',
+          recruiterEmail: recruiter.email,
+          recruiterSlug: recruiter.slug,
           referenceUrl: referenceUrl
         })
       })
