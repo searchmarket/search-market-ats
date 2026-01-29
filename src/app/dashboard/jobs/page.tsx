@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   Plus, Search, Briefcase, MoreVertical, Pencil, Trash2, X, Building2, 
   MapPin, DollarSign, ArrowLeft, Users, Sparkles, Globe, EyeOff, Loader2,
-  Lock, Unlock, Clock, RefreshCw, User, XCircle
+  Lock, Unlock, Clock, RefreshCw, User, XCircle, Copy
 } from 'lucide-react'
 
 interface Client {
@@ -584,6 +584,45 @@ export default function JobsPage() {
     setClosingJob(false)
   }
 
+  async function duplicateJob(job: Job) {
+    if (!currentUserId) return
+    
+    const { data, error } = await supabase
+      .from('jobs')
+      .insert([{
+        title: job.title,
+        client_id: job.client_id,
+        hiring_manager_id: job.hiring_manager_id,
+        description: job.description,
+        requirements: job.requirements,
+        city: job.city,
+        state: job.state,
+        country: job.country,
+        location_type: job.location_type,
+        employment_type: job.employment_type,
+        salary_min: job.salary_min,
+        salary_max: job.salary_max,
+        salary_currency: job.salary_currency,
+        fee_percent: job.fee_percent,
+        status: 'open',
+        is_published: false,
+        recruiter_id: currentUserId
+      }])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error duplicating job:', error)
+      alert('Error creating duplicate job')
+    } else if (data) {
+      fetchJobs()
+      // Open the new job
+      setSelectedJob(data)
+      router.push(`/dashboard/jobs?id=${data.id}`, { scroll: false })
+      alert('New job created successfully!')
+    }
+  }
+
   function openDetailView(job: Job) {
     setSelectedJob(job)
     setShowDetailView(true)
@@ -750,9 +789,9 @@ export default function JobsPage() {
                       {selectedJob.status.replace('_', ' ')}
                     </span>
                     {(selectedJob.status === 'filled' || selectedJob.status === 'cancelled') && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-800 text-white">
-                        <XCircle className="w-3 h-3" />
-                        Closed
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold rounded-full bg-red-600 text-white animate-pulse">
+                        <XCircle className="w-4 h-4" />
+                        CLOSED
                       </span>
                     )}
                     {selectedJob.is_published && (
@@ -775,7 +814,7 @@ export default function JobsPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap justify-end">
                   <button
                     type="button"
                     onClick={() => openEditModal(selectedJob)}
@@ -784,32 +823,42 @@ export default function JobsPage() {
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
-                  {(selectedJob.status === 'open' || selectedJob.status === 'on_hold' || selectedJob.status === 'draft') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPlacementData({ candidate_id: '', start_date: '', starting_salary: '' })
-                        setCloseJobStatus('filled')
-                        setShowCloseJobModal(true)
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Close Job
-                    </button>
-                  )}
                   <button
                     type="button"
-                    onClick={() => togglePublish(selectedJob)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                      selectedJob.is_published
-                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        : 'bg-brand-green text-white hover:bg-green-700'
-                    }`}
+                    onClick={() => duplicateJob(selectedJob)}
+                    className="flex items-center gap-2 px-3 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50"
                   >
-                    {selectedJob.is_published ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
-                    {selectedJob.is_published ? 'Unpublish' : 'Publish to Board'}
+                    <Copy className="w-4 h-4" />
+                    Create Identical New Job
                   </button>
+                  {(selectedJob.status === 'open' || selectedJob.status === 'on_hold' || selectedJob.status === 'draft') && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlacementData({ candidate_id: '', start_date: '', starting_salary: '' })
+                          setCloseJobStatus('filled')
+                          setShowCloseJobModal(true)
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Close Job
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => togglePublish(selectedJob)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                          selectedJob.is_published
+                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            : 'bg-brand-green text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {selectedJob.is_published ? <EyeOff className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                        {selectedJob.is_published ? 'Unpublish' : 'Publish to Board'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1420,9 +1469,9 @@ export default function JobsPage() {
                       {job.status.replace('_', ' ')}
                     </span>
                     {(job.status === 'filled' || job.status === 'cancelled') && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-800 text-white">
-                        <XCircle className="w-3 h-3" />
-                        Closed
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full bg-red-600 text-white">
+                        <XCircle className="w-3.5 h-3.5" />
+                        CLOSED
                       </span>
                     )}
                     {job.is_published && (
