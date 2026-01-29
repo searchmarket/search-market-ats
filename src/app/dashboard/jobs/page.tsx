@@ -724,6 +724,7 @@ export default function JobsPage() {
       // Agency Jobs: agency-only jobs from OTHER agency members (not your own)
       return currentUserAgencyId && 
              job.agency_id === currentUserAgencyId && 
+             job.visibility === 'agency_only' &&
              job.status === 'open' &&
              job.recruiter_id !== currentUserId
     } else if (activeTab === 'platform') {
@@ -745,6 +746,7 @@ export default function JobsPage() {
   const agencyJobsCount = currentUserAgencyId ? jobs.filter(j => 
     j.status === 'open' && 
     j.agency_id === currentUserAgencyId &&
+    j.visibility === 'agency_only' &&
     j.recruiter_id !== currentUserId
   ).length : 0
 
