@@ -721,16 +721,18 @@ export default function JobsPage() {
     if (!currentUserId) return true // Show all while loading
     
     if (activeTab === 'agency') {
-      // Agency Jobs: all open jobs within user's agency
-      return currentUserAgencyId && job.agency_id === currentUserAgencyId && job.status === 'open'
+      // Agency Jobs: agency-only jobs from OTHER agency members (not your own)
+      return currentUserAgencyId && 
+             job.agency_id === currentUserAgencyId && 
+             job.status === 'open' &&
+             job.recruiter_id !== currentUserId
     } else if (activeTab === 'platform') {
-      // Platform Jobs: all open jobs visible to platform from OTHER recruiters
-      // Treat null/undefined visibility as 'platform' (default)
+      // Platform Jobs: platform-visible jobs from OTHER recruiters
       return job.recruiter_id !== currentUserId && 
              job.status === 'open' && 
              (job.visibility === 'platform' || !job.visibility)
     } else if (activeTab === 'mine') {
-      // My Jobs: only open jobs I created
+      // My Jobs: all open jobs I created (regardless of visibility)
       return job.recruiter_id === currentUserId && job.status === 'open'
     } else if (activeTab === 'closed') {
       // My Closed Jobs: filled or cancelled jobs I created
@@ -741,7 +743,9 @@ export default function JobsPage() {
 
   // Counts for tabs
   const agencyJobsCount = currentUserAgencyId ? jobs.filter(j => 
-    j.status === 'open' && j.agency_id === currentUserAgencyId
+    j.status === 'open' && 
+    j.agency_id === currentUserAgencyId &&
+    j.recruiter_id !== currentUserId
   ).length : 0
 
   const platformJobsCount = jobs.filter(j => 
