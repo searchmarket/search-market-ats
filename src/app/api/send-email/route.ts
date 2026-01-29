@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
     const fontFamily = "Calibri, 'Segoe UI', Arial, sans-serif"
     const fontSize = '14px' // 11pt equivalent for web
 
+    // Get reference first name
+    const referenceFirstName = referenceName?.split(' ')[0] || 'there'
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
         subject: subject,
         html: `
           <div style="font-family: ${fontFamily}; font-size: ${fontSize}; color: #333333; line-height: 1.5; max-width: 600px;">
-            <p style="margin: 0 0 16px 0;">Hi,</p>
+            <p style="margin: 0 0 16px 0;">Hi ${referenceFirstName},</p>
             
             <p style="margin: 0 0 16px 0;">My name is ${recruiterName} and I'm a recruiter working with Search Market, a new AI powered talent finding platform. I was given your information as a reference for <strong>${candidateName}</strong>.</p>
             
@@ -63,9 +66,8 @@ export async function POST(request: NextRequest) {
             <p style="margin: 0 0 16px 0;">Thanks very much in advance!</p>
             
             <p style="margin: 24px 0 0 0;">
-              Craig Ferguson<br>
-              <a href="https://Search.Market" style="color: ${linkColor};">https://Search.Market</a><br>
-              <a href="mailto:craig.ferguson@search.market" style="color: ${linkColor};">craig.ferguson@search.market</a>
+              ${recruiterName}<br>
+              <a href="https://Search.Market" style="color: ${linkColor};">https://Search.Market</a>
             </p>
           </div>
         `,
