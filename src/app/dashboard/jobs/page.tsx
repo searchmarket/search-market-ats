@@ -771,6 +771,7 @@ export default function JobsPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => openEditModal(selectedJob)}
                     className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
                   >
@@ -779,7 +780,12 @@ export default function JobsPage() {
                   </button>
                   {(selectedJob.status === 'open' || selectedJob.status === 'on_hold' || selectedJob.status === 'draft') && (
                     <button
-                      onClick={openCloseJobModal}
+                      type="button"
+                      onClick={() => {
+                        setPlacementData({ candidate_id: '', start_date: '', starting_salary: '' })
+                        setCloseJobStatus('filled')
+                        setShowCloseJobModal(true)
+                      }}
                       className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
                     >
                       <XCircle className="w-4 h-4" />
@@ -787,6 +793,7 @@ export default function JobsPage() {
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => togglePublish(selectedJob)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
                       selectedJob.is_published
@@ -1166,6 +1173,113 @@ export default function JobsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Close Job Modal - Detail View */}
+        {showCloseJobModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900">Close Job</h2>
+                <button 
+                  type="button"
+                  onClick={() => setShowCloseJobModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                  <select
+                    value={closeJobStatus}
+                    onChange={(e) => {
+                      setCloseJobStatus(e.target.value)
+                      if (e.target.value !== 'filled') {
+                        setPlacementData({ candidate_id: '', start_date: '', starting_salary: '' })
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    <option value="filled">Filled</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="on_hold">On Hold</option>
+                  </select>
+                </div>
+
+                {closeJobStatus === 'filled' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Candidate *</label>
+                      <select
+                        value={placementData.candidate_id}
+                        onChange={(e) => setPlacementData({ ...placementData, candidate_id: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      >
+                        <option value="">
+                          {applications.length === 0 
+                            ? 'No candidates in pipeline' 
+                            : 'Select candidate...'}
+                        </option>
+                        {applications.map((app) => (
+                          <option key={app.id} value={app.candidate_id}>
+                            {app.candidates.first_name} {app.candidates.last_name}
+                            {app.candidates.current_title ? ` - ${app.candidates.current_title}` : ''}
+                            {` (${app.stage})`}
+                          </option>
+                        ))}
+                      </select>
+                      {applications.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          Add candidates to the pipeline before closing as filled
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                      <input
+                        type="date"
+                        value={placementData.start_date}
+                        onChange={(e) => setPlacementData({ ...placementData, start_date: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Starting Salary *</label>
+                      <input
+                        type="number"
+                        value={placementData.starting_salary}
+                        onChange={(e) => setPlacementData({ ...placementData, starting_salary: e.target.value })}
+                        placeholder="85000"
+                        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCloseJobModal(false)}
+                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeJob}
+                    disabled={closingJob || (closeJobStatus === 'filled' && (!placementData.candidate_id || !placementData.start_date || !placementData.starting_salary))}
+                    className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {closingJob ? 'Closing...' : 'Close Job'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
