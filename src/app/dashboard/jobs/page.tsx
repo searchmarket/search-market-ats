@@ -715,10 +715,10 @@ export default function JobsPage() {
       return currentUserAgencyId && job.agency_id === currentUserAgencyId && job.status === 'open'
     } else if (activeTab === 'platform') {
       // Platform Jobs: all open jobs visible to platform from OTHER recruiters
-      // Only show jobs with visibility='platform' (excludes agency-only jobs)
+      // Treat null/undefined visibility as 'platform' (default)
       return job.recruiter_id !== currentUserId && 
              job.status === 'open' && 
-             job.visibility === 'platform'
+             (job.visibility === 'platform' || !job.visibility)
     } else if (activeTab === 'mine') {
       // My Jobs: only open jobs I created
       return job.recruiter_id === currentUserId && job.status === 'open'
@@ -737,7 +737,7 @@ export default function JobsPage() {
   const platformJobsCount = jobs.filter(j => 
     j.status === 'open' && 
     j.recruiter_id !== currentUserId && 
-    j.visibility === 'platform'
+    (j.visibility === 'platform' || !j.visibility)
   ).length
   
   const myJobsCount = jobs.filter(j => 
