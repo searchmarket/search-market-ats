@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { 
   Users, Search, Filter, ChevronDown, GripVertical, 
   Mail, Phone, Briefcase, MapPin, Clock, ExternalLink,
-  Loader2, ArrowLeft
+  Loader2, ArrowLeft, X, DollarSign, Calendar
 } from 'lucide-react'
 
 interface Job {
@@ -57,6 +57,17 @@ export default function PipelinePage() {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  
+  // Hired modal state
+  const [showHiredModal, setShowHiredModal] = useState(false)
+  const [hiredApplication, setHiredApplication] = useState<Application | null>(null)
+  const [showPlacementDetails, setShowPlacementDetails] = useState(false)
+  const [placementData, setPlacementData] = useState({
+    starting_salary: '',
+    start_date: ''
+  })
+  const [processingPlacement, setProcessingPlacement] = useState(false)
+  
   const supabase = createClient()
 
   useEffect(() => {
@@ -115,7 +126,18 @@ export default function PipelinePage() {
     setLoading(false)
   }
 
-  async function updateStage(applicationId: string, newStage: string) {
+  async function updateStage(applicationId: string, newStage: string, skipHiredModal: boolean = false) {
+    // If moving to hired stage, show the modal first
+    if (newStage === 'hired' && !skipHiredModal) {
+      const app = applications.find(a => a.id === applicationId)
+      if (app) {
+        setHiredApplication(app)
+        setShowHiredModal(true)
+        setPlacementData({ starting_salary: '', start_date: '' })
+        return // Don't update yet, wait for modal response
+      }
+    }
+    
     const { error } = await supabase
       .from('applications')
       .update({ stage: newStage, updated_at: new Date().toISOString() })
@@ -130,6 +152,81 @@ export default function PipelinePage() {
         )
       )
     }
+  }
+
+  async function handleHiredResponse(markAsFilled: boolean) {
+    if (!hiredApplication) return
+    
+    if (markAsFilled) {
+      // Show placement details form
+      setShowPlacementDetails(true)
+    } else {
+      // Just move to hired without closing job
+      await updateStage(hiredApplication.id, 'hired', true)
+      setShowHiredModal(false)
+      setHiredApplication(null)
+    }
+  }
+
+  async function submitPlacement() {
+    if (!hiredApplication || !placementData.starting_salary || !placementData.start_date) {
+      alert('Please enter starting salary and start date')
+      return
+    }
+    
+    setProcessingPlacement(true)
+    
+    try {
+      // 1. Update application to hired stage
+      await supabase
+        .from('applications')
+        .update({ 
+          stage: 'hired', 
+          updated_at: new Date().toISOString(),
+          starting_salary: parseFloat(placementData.starting_salary),
+          start_date: placementData.start_date
+        })
+        .eq('id', hiredApplication.id)
+      
+      // 2. Update job status to filled and unpublish
+      await supabase
+        .from('jobs')
+        .update({ 
+          status: 'filled',
+          is_published: false 
+        })
+        .eq('id', hiredApplication.job_id)
+      
+      // 3. Update candidate status to placed and set placement timestamp
+      await supabase
+        .from('candidates')
+        .update({ 
+          status: 'placed',
+          placed_at: new Date().toISOString()
+        })
+        .eq('id', hiredApplication.candidate_id)
+      
+      // Update local state
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === hiredApplication.id 
+            ? { ...app, stage: 'hired', updated_at: new Date().toISOString() } 
+            : app
+        )
+      )
+      
+      // Close modal
+      setShowHiredModal(false)
+      setShowPlacementDetails(false)
+      setHiredApplication(null)
+      setPlacementData({ starting_salary: '', start_date: '' })
+      
+    } catch (error) {
+      console.error('Error processing placement:', error)
+      alert('Error processing placement')
+    }
+    
+    setProcessingPlacement(false)
   }
 
   function handleDragStart(e: React.DragEvent, applicationId: string) {
@@ -348,6 +445,117 @@ export default function PipelinePage() {
           ))}
         </div>
       </div>
+
+      {/* Hired Modal */}
+      {showHiredModal && hiredApplication && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {showPlacementDetails ? 'Placement Details' : 'Candidate Hired!'}
+              </h2>
+              <button 
+                onClick={() => {
+                  setShowHiredModal(false)
+                  setShowPlacementDetails(false)
+                  setHiredApplication(null)
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {!showPlacementDetails ? (
+              // Initial question
+              <div className="p-6">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Briefcase className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-lg mb-2">
+                    {hiredApplication.candidate.first_name} {hiredApplication.candidate.last_name}
+                  </h3>
+                  <p className="text-gray-500 text-sm">
+                    has been moved to Hired for <span className="font-medium">{hiredApplication.job.title}</span>
+                  </p>
+                </div>
+                
+                <p className="text-center text-gray-700 mb-6">
+                  Do you want to mark the job as filled and close it?
+                </p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleHiredResponse(false)}
+                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700"
+                  >
+                    Not at this time
+                  </button>
+                  <button
+                    onClick={() => handleHiredResponse(true)}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700"
+                  >
+                    Yes
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Placement details form
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Starting Salary *
+                    </div>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={placementData.starting_salary}
+                    onChange={(e) => setPlacementData({ ...placementData, starting_salary: e.target.value })}
+                    placeholder="85000"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Start Date *
+                    </div>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={placementData.start_date}
+                    onChange={(e) => setPlacementData({ ...placementData, start_date: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button
+                    onClick={() => setShowPlacementDetails(false)}
+                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={submitPlacement}
+                    disabled={processingPlacement || !placementData.starting_salary || !placementData.start_date}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {processingPlacement ? 'Processing...' : 'Complete Placement'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

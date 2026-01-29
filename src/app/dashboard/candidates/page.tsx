@@ -50,6 +50,7 @@ interface Candidate {
   owned_at: string | null
   exclusive_until: string | null
   last_two_way_contact: string | null
+  placed_at: string | null
   recruiter_id: string
   owner?: { full_name: string | null; email: string } | null
 }
@@ -410,6 +411,27 @@ export default function CandidatesPage() {
     
     // Check if owned
     if (candidate.owned_by) {
+      // Special rule for placed candidates: 6 months ownership
+      if (candidate.status === 'placed' && candidate.placed_at) {
+        const placedDate = new Date(candidate.placed_at)
+        const sixMonthsLater = new Date(placedDate)
+        sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6)
+        
+        // If more than 6 months have passed, check for two-way contact
+        if (now > sixMonthsLater) {
+          // If no two-way contact within the 6-month period after placement, they're open
+          if (!candidate.last_two_way_contact || new Date(candidate.last_two_way_contact) < placedDate) {
+            return 'open'
+          }
+          // If last two-way contact was more than 6 months ago, they're open
+          const lastContact = new Date(candidate.last_two_way_contact)
+          const sixMonthsAfterLastContact = new Date(lastContact)
+          sixMonthsAfterLastContact.setMonth(sixMonthsAfterLastContact.getMonth() + 6)
+          if (now > sixMonthsAfterLastContact) {
+            return 'open'
+          }
+        }
+      }
       return 'owned'
     }
     

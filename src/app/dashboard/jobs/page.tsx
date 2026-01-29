@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { 
   Plus, Search, Briefcase, MoreVertical, Pencil, Trash2, X, Building2, 
   MapPin, DollarSign, ArrowLeft, Users, Sparkles, Globe, EyeOff, Loader2,
-  Lock, Unlock, Clock, RefreshCw, User
+  Lock, Unlock, Clock, RefreshCw, User, XCircle
 } from 'lucide-react'
 
 interface Client {
@@ -85,6 +85,9 @@ export default function JobsPage() {
   const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [showCloseJobModal, setShowCloseJobModal] = useState(false)
+  const [closeJobStatus, setCloseJobStatus] = useState('filled')
+  const [closingJob, setClosingJob] = useState(false)
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -459,6 +462,63 @@ export default function JobsPage() {
     }
   }
 
+  function hasHiredCandidates(jobId: string): boolean {
+    return applications.some(app => app.job_id === jobId && app.stage === 'hired')
+  }
+
+  function openCloseJobModal() {
+    if (!selectedJob) return
+    
+    // Check if there's a hired candidate
+    if (hasHiredCandidates(selectedJob.id)) {
+      // Auto-close with filled status
+      closeJob('filled')
+    } else {
+      // Show modal to select status
+      setCloseJobStatus('filled')
+      setShowCloseJobModal(true)
+    }
+  }
+
+  async function closeJob(status: string) {
+    if (!selectedJob) return
+    
+    setClosingJob(true)
+    
+    const { error } = await supabase
+      .from('jobs')
+      .update({ 
+        status: status,
+        is_published: false 
+      })
+      .eq('id', selectedJob.id)
+
+    if (error) {
+      console.error('Error closing job:', error)
+      alert('Error closing job')
+    } else {
+      // If status is filled and there's a hired candidate, mark them as placed
+      if (status === 'filled') {
+        const hiredApps = applications.filter(app => app.job_id === selectedJob.id && app.stage === 'hired')
+        for (const app of hiredApps) {
+          await supabase
+            .from('candidates')
+            .update({ 
+              status: 'placed',
+              placed_at: new Date().toISOString()
+            })
+            .eq('id', app.candidate_id)
+        }
+      }
+      
+      fetchJobs()
+      setSelectedJob({ ...selectedJob, status: status, is_published: false })
+      setShowCloseJobModal(false)
+    }
+    
+    setClosingJob(false)
+  }
+
   function openDetailView(job: Job) {
     setSelectedJob(job)
     setShowDetailView(true)
@@ -652,6 +712,15 @@ export default function JobsPage() {
                     <Pencil className="w-4 h-4" />
                     Edit
                   </button>
+                  {(selectedJob.status === 'open' || selectedJob.status === 'on_hold' || selectedJob.status === 'draft') && (
+                    <button
+                      onClick={openCloseJobModal}
+                      className="flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Close Job
+                    </button>
+                  )}
                   <button
                     onClick={() => togglePublish(selectedJob)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
@@ -1492,6 +1561,55 @@ export default function JobsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Close Job Modal */}
+      {showCloseJobModal && selectedJob && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900">Close Job</h2>
+              <button 
+                onClick={() => setShowCloseJobModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Select the status to close this job with:
+              </p>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={closeJobStatus}
+                  onChange={(e) => setCloseJobStatus(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                >
+                  <option value="filled">Filled</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="on_hold">On Hold</option>
+                </select>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCloseJobModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => closeJob(closeJobStatus)}
+                  disabled={closingJob}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {closingJob ? 'Closing...' : 'Close Job'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
