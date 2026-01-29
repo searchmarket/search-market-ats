@@ -68,7 +68,7 @@ interface Job {
   created_at: string
   recruiter_id: string
   agency_id: string | null
-  visibility: 'platform' | 'agency_only'
+  visibility: 'platform' | 'agency_only' | null
 }
 
 export default function JobsPage() {
@@ -216,10 +216,10 @@ export default function JobsPage() {
     if (user) {
       setCurrentUserId(user.id)
       
-      // Check if user is admin, get name, and get agency_id
+      // Check if user is admin and get name
       const { data: recruiter } = await supabase
         .from('recruiters')
-        .select('is_admin, full_name, agency_id')
+        .select('is_admin, full_name')
         .eq('id', user.id)
         .single()
       
@@ -229,8 +229,18 @@ export default function JobsPage() {
       if (recruiter?.full_name) {
         setCurrentUserName(recruiter.full_name)
       }
-      if (recruiter?.agency_id) {
-        setCurrentUserAgencyId(recruiter.agency_id)
+      
+      // Check if user is a member of any agency
+      const { data: membership } = await supabase
+        .from('agency_members')
+        .select('agency_id')
+        .eq('recruiter_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+        .single()
+      
+      if (membership?.agency_id) {
+        setCurrentUserAgencyId(membership.agency_id)
         // Set default tab to agency if user is part of an agency
         setActiveTab('agency')
       }
