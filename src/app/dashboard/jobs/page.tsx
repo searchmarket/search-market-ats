@@ -714,12 +714,11 @@ export default function JobsPage() {
       // Agency Jobs: all open jobs within user's agency
       return currentUserAgencyId && job.agency_id === currentUserAgencyId && job.status === 'open'
     } else if (activeTab === 'platform') {
-      // Platform Jobs: all open jobs visible to platform (not agency-only) from OTHER recruiters
+      // Platform Jobs: all open jobs visible to platform from OTHER recruiters
+      // Only show jobs with visibility='platform' (excludes agency-only jobs)
       return job.recruiter_id !== currentUserId && 
              job.status === 'open' && 
-             job.visibility === 'platform' &&
-             // Exclude agency-only jobs from other agencies
-             (job.agency_id === currentUserAgencyId || job.visibility !== 'agency_only')
+             job.visibility === 'platform'
     } else if (activeTab === 'mine') {
       // My Jobs: only open jobs I created
       return job.recruiter_id === currentUserId && job.status === 'open'
