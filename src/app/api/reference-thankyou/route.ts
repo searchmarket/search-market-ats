@@ -105,23 +105,23 @@ export async function POST(request: NextRequest) {
     if (isClaimed) {
       // Simple thank you for claimed contacts/candidates
       emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+        <div style="font-family: Calibri, Arial, sans-serif; font-size: 11pt; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <p style="color: #374151; margin-bottom: 20px;">
             Hi ${referenceFirstName},
           </p>
-          <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+          <p style="color: #374151; margin-bottom: 20px;">
             Thanks again for taking time to fill in ${candidateFirstName}'s reference form!
           </p>
-          <p style="color: #374151; font-size: 16px; margin-bottom: 8px;">
+          <p style="color: #374151; margin-bottom: 8px;">
             Best Regards,
           </p>
-          <p style="color: #374151; font-size: 16px; margin-bottom: 8px;">
+          <p style="color: #374151; margin-bottom: 8px;">
             <strong>${recruiterName}</strong>
           </p>
-          <p style="color: #374151; font-size: 14px; margin-bottom: 4px;">
-            <a href="https://search.market" style="color: #2563eb;">https://Search.Market</a>
+          <p style="margin-bottom: 4px;">
+            <a href="https://search.market" style="color: #4a6785; text-decoration: none;">https://Search.Market</a>
           </p>
-          <p style="color: #6b7280; font-size: 14px;">
+          <p style="color: #6b7280;">
             ${recruiterEmailAddress}
           </p>
         </div>
@@ -129,23 +129,23 @@ export async function POST(request: NextRequest) {
     } else {
       // Marketing thank you for unclaimed contacts/candidates
       emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
+        <div style="font-family: Calibri, Arial, sans-serif; font-size: 11pt; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <p style="color: #374151; margin-bottom: 20px;">
             Hi ${referenceFirstName},
           </p>
-          <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
-            Thanks again for taking time to fill in ${candidateFirstName}'s reference form! If you need help hiring or you ever want to start looking for new job opportunities, simply visit my <a href="${recruiterPageUrl}" style="color: #2563eb;">Search.Market</a> page.
+          <p style="color: #374151; margin-bottom: 20px;">
+            Thanks again for taking time to fill in ${candidateFirstName}'s reference form! If you need help hiring or you ever want to start looking for new job opportunities, simply visit my <a href="${recruiterPageUrl}" style="color: #4a6785; text-decoration: none;">Search.Market</a> page.
           </p>
-          <p style="color: #374151; font-size: 16px; margin-bottom: 20px;">
-            <a href="https://search.market" style="color: #2563eb;">Search.Market</a> connects the highest caliber recruiters to collaborate on filling your jobs.
+          <p style="color: #374151; margin-bottom: 20px;">
+            <a href="https://search.market" style="color: #4a6785; text-decoration: none;">Search.Market</a> connects the highest caliber recruiters to collaborate on filling your jobs.
           </p>
-          <p style="color: #374151; font-size: 16px; margin-bottom: 8px;">
+          <p style="color: #374151; margin-bottom: 8px;">
             <strong>${recruiterName}</strong>
           </p>
-          <p style="color: #374151; font-size: 14px; margin-bottom: 4px;">
-            <a href="https://search.market" style="color: #2563eb;">https://Search.Market</a>
+          <p style="margin-bottom: 4px;">
+            <a href="https://search.market" style="color: #4a6785; text-decoration: none;">https://Search.Market</a>
           </p>
-          <p style="color: #6b7280; font-size: 14px;">
+          <p style="color: #6b7280;">
             ${recruiterEmailAddress}
           </p>
         </div>
