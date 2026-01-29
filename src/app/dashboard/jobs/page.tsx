@@ -30,6 +30,7 @@ interface Candidate {
 
 interface Application {
   id: string
+  job_id: string
   stage: string
   candidate_id: string
   candidates: Candidate
@@ -250,7 +251,7 @@ export default function JobsPage() {
   async function fetchApplicationsForJob(jobId: string) {
     const { data, error } = await supabase
       .from('applications')
-      .select('id, stage, candidate_id, candidates(id, first_name, last_name, current_title, owned_by, owned_at, exclusive_until, owner:recruiters!owned_by(full_name))')
+      .select('id, job_id, stage, candidate_id, candidates(id, first_name, last_name, current_title, owned_by, owned_at, exclusive_until, owner:recruiters!owned_by(full_name))')
       .eq('job_id', jobId)
 
     if (error) {
