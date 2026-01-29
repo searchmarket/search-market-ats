@@ -57,6 +57,7 @@ export default function PipelinePage() {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserName, setCurrentUserName] = useState<string>('')
   
   // Hired modal state
   const [showHiredModal, setShowHiredModal] = useState(false)
@@ -85,6 +86,17 @@ export default function PipelinePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setCurrentUserId(user.id)
+      
+      // Fetch user's name
+      const { data: recruiter } = await supabase
+        .from('recruiters')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+      
+      if (recruiter?.full_name) {
+        setCurrentUserName(recruiter.full_name)
+      }
     } else {
       // No user, stop loading
       setLoading(false)
@@ -169,7 +181,7 @@ export default function PipelinePage() {
   }
 
   async function submitPlacement() {
-    if (!hiredApplication || !placementData.starting_salary || !placementData.start_date) {
+    if (!hiredApplication || !placementData.starting_salary || !placementData.start_date || !currentUserId) {
       alert('Please enter starting salary and start date')
       return
     }
@@ -205,6 +217,25 @@ export default function PipelinePage() {
           placed_at: new Date().toISOString()
         })
         .eq('id', hiredApplication.candidate_id)
+      
+      // 4. Log placement activity
+      const jobTitle = hiredApplication.job?.title || 'Unknown Position'
+      const clientName = hiredApplication.job?.client?.company_name || 'Unknown Company'
+      const recruiterName = currentUserName || 'Unknown'
+      
+      await supabase.from('activity_logs').insert([{
+        candidate_id: hiredApplication.candidate_id,
+        recruiter_id: currentUserId,
+        activity_type: 'placement',
+        notes: `Placed by ${recruiterName} as a ${jobTitle} to ${clientName}`,
+        metadata: {
+          job_id: hiredApplication.job_id,
+          job_title: jobTitle,
+          client_name: clientName,
+          starting_salary: parseFloat(placementData.starting_salary),
+          start_date: placementData.start_date
+        }
+      }])
       
       // Update local state
       setApplications(prev => 

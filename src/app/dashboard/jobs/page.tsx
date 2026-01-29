@@ -85,6 +85,7 @@ export default function JobsPage() {
   const [generatingJD, setGeneratingJD] = useState(false)
   const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserName, setCurrentUserName] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [showCloseJobModal, setShowCloseJobModal] = useState(false)
   const [closeJobStatus, setCloseJobStatus] = useState('filled')
@@ -206,15 +207,18 @@ export default function JobsPage() {
     if (user) {
       setCurrentUserId(user.id)
       
-      // Check if user is admin
+      // Check if user is admin and get name
       const { data: recruiter } = await supabase
         .from('recruiters')
-        .select('is_admin')
+        .select('is_admin, full_name')
         .eq('id', user.id)
         .single()
       
       if (recruiter?.is_admin) {
         setIsAdmin(true)
+      }
+      if (recruiter?.full_name) {
+        setCurrentUserName(recruiter.full_name)
       }
     }
   }
@@ -482,7 +486,7 @@ export default function JobsPage() {
   }
 
   async function closeJob(status: string) {
-    if (!selectedJob) return
+    if (!selectedJob || !currentUserId) return
     
     setClosingJob(true)
     
@@ -502,6 +506,7 @@ export default function JobsPage() {
       if (status === 'filled') {
         const hiredApps = applications.filter(app => app.job_id === selectedJob.id && app.stage === 'hired')
         for (const app of hiredApps) {
+          // Update candidate status to placed
           await supabase
             .from('candidates')
             .update({ 
@@ -509,6 +514,23 @@ export default function JobsPage() {
               placed_at: new Date().toISOString()
             })
             .eq('id', app.candidate_id)
+          
+          // Log placement activity
+          const jobTitle = selectedJob.title || 'Unknown Position'
+          const clientName = selectedJob.clients?.company_name || 'Unknown Company'
+          const recruiterName = currentUserName || 'Unknown'
+          
+          await supabase.from('activity_logs').insert([{
+            candidate_id: app.candidate_id,
+            recruiter_id: currentUserId,
+            activity_type: 'placement',
+            notes: `Placed by ${recruiterName} as a ${jobTitle} to ${clientName}`,
+            metadata: {
+              job_id: selectedJob.id,
+              job_title: jobTitle,
+              client_name: clientName
+            }
+          }])
         }
       }
       

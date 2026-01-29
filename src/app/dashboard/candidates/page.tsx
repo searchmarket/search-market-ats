@@ -1070,7 +1070,8 @@ export default function CandidatesPage() {
     note: 'Note',
     status_change: 'Status Change',
     claimed: 'Claimed',
-    released: 'Released'
+    released: 'Released',
+    placement: 'Placed'
   }
 
   const channelLabels: Record<string, string> = {
@@ -1311,6 +1312,7 @@ export default function CandidatesPage() {
                   {activityLogs.map((log) => (
                     <div key={log.id} className="flex gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                        log.activity_type === 'placement' ? 'bg-emerald-100 text-emerald-600' :
                         log.activity_type === 'claimed' ? 'bg-green-100 text-green-600' :
                         log.activity_type === 'released' ? 'bg-red-100 text-red-600' :
                         log.channel === 'email' ? 'bg-blue-100 text-blue-600' :
@@ -1318,7 +1320,8 @@ export default function CandidatesPage() {
                         log.channel === 'sms' ? 'bg-green-100 text-green-600' :
                         'bg-gray-100 text-gray-600'
                       }`}>
-                        {log.activity_type === 'claimed' ? <Lock className="w-4 h-4" /> :
+                        {log.activity_type === 'placement' ? <Briefcase className="w-4 h-4" /> :
+                         log.activity_type === 'claimed' ? <Lock className="w-4 h-4" /> :
                          log.activity_type === 'released' ? <Unlock className="w-4 h-4" /> :
                          log.channel === 'email' ? <Mail className="w-4 h-4" /> :
                          log.channel === 'phone' ? <PhoneCall className="w-4 h-4" /> :
