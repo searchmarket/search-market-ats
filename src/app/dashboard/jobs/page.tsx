@@ -749,6 +749,12 @@ export default function JobsPage() {
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[selectedJob.status]}`}>
                       {selectedJob.status.replace('_', ' ')}
                     </span>
+                    {(selectedJob.status === 'filled' || selectedJob.status === 'cancelled') && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-800 text-white">
+                        <XCircle className="w-3 h-3" />
+                        Closed
+                      </span>
+                    )}
                     {selectedJob.is_published && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-brand-green/10 text-brand-green">
                         <Globe className="w-3 h-3" />
@@ -1413,6 +1419,12 @@ export default function JobsPage() {
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[job.status]}`}>
                       {job.status.replace('_', ' ')}
                     </span>
+                    {(job.status === 'filled' || job.status === 'cancelled') && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-800 text-white">
+                        <XCircle className="w-3 h-3" />
+                        Closed
+                      </span>
+                    )}
                     {job.is_published && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-brand-green/10 text-brand-green">
                         <Globe className="w-3 h-3" />
