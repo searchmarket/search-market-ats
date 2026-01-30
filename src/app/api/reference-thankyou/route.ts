@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
             Thanks again for taking time to fill in ${candidateFirstName}'s reference form! If you need help hiring or you ever want to start looking for new job opportunities, simply visit my <a href="${recruiterPageUrl}" style="color: ${linkColor};">Search.Market</a> page.
           </p>
           <p style="color: #374151; margin-bottom: 20px;">
-            <a href="https://search.market" style="color: ${linkColor};">Search.Market</a> connects the highest caliber recruiters to collaborate on filling your jobs.
+            <a href="https://search.market" style="color: ${linkColor};">Search.Market</a> connects elite recruiters who collaborate on filling your jobs.
           </p>
           <p style="color: #374151; line-height: 1.4; margin: 0;">${recruiterName}<br><a href="${recruiterPageUrl}" style="color: ${linkColor};">Search.Market</a><br><a href="mailto:${recruiterEmailAddress}" style="color: ${linkColor};">${recruiterEmailAddress}</a></p>
         </div>
