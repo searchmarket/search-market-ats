@@ -10,9 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Megaphone,
-  Kanban
+  Kanban,
+  ExternalLink
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase-browser'
 
 const navItems: { label: string; href: string; icon: any }[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -26,6 +28,27 @@ const navItems: { label: string; href: string; icon: any }[] = [
 export default function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [recruiterSlug, setRecruiterSlug] = useState<string | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchRecruiterSlug()
+  }, [])
+
+  async function fetchRecruiterSlug() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: recruiter } = await supabase
+        .from('recruiters')
+        .select('slug')
+        .eq('id', user.id)
+        .single()
+      
+      if (recruiter?.slug) {
+        setRecruiterSlug(recruiter.slug)
+      }
+    }
+  }
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
@@ -33,6 +56,10 @@ export default function Sidebar() {
     }
     return pathname.startsWith(href)
   }
+
+  const myPageUrl = recruiterSlug 
+    ? `https://jobs.search.market/r/${recruiterSlug}` 
+    : null
 
   return (
     <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-brand-navy min-h-screen flex flex-col transition-all duration-300`}>
@@ -64,6 +91,19 @@ export default function Sidebar() {
             {!collapsed && <span className="font-medium">{item.label}</span>}
           </Link>
         ))}
+        
+        {/* My Page - External Link */}
+        {myPageUrl && (
+          <a
+            href={myPageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-white/70 hover:bg-white/10 hover:text-white"
+          >
+            <ExternalLink className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span className="font-medium">My Page</span>}
+          </a>
+        )}
       </nav>
 
       {/* Collapse Toggle */}
