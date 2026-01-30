@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
           <div style="font-family: ${fontFamily}; font-size: ${fontSize}; color: #333333; line-height: 1.5; max-width: 600px;">
             <p style="margin: 0 0 16px 0;">Hi ${referenceFirstName},</p>
             
-            <p style="margin: 0 0 16px 0;">My name is ${recruiterName} and I'm a recruiter working with Search Market, a new AI powered talent finding platform. I was given your information as a reference for <strong>${candidateName}</strong>.</p>
+            <p style="margin: 0 0 16px 0;">My name is ${recruiterName} and I'm a recruiter working with Search.Market, a platform that connects elite recruiters who collaborate on filling your jobs. I was given your information as a reference for <strong>${candidateName}</strong>.</p>
             
             <p style="margin: 0 0 16px 0;">I am wondering if you could take a moment to visit the following page and fill in the reference information.</p>
             
