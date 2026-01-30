@@ -93,17 +93,15 @@ export default function Sidebar() {
         ))}
         
         {/* My Page - External Link */}
-        {myPageUrl && (
-          <a
-            href={myPageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-white/70 hover:bg-white/10 hover:text-white"
-          >
-            <ExternalLink className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span className="font-medium">My Page</span>}
-          </a>
-        )}
+        <a
+          href={myPageUrl || '/dashboard/settings'}
+          target={myPageUrl ? '_blank' : '_self'}
+          rel={myPageUrl ? 'noopener noreferrer' : undefined}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-white/70 hover:bg-white/10 hover:text-white"
+        >
+          <ExternalLink className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span className="font-medium">My Page</span>}
+        </a>
       </nav>
 
       {/* Collapse Toggle */}
