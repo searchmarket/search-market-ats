@@ -59,12 +59,14 @@ export async function POST(request: NextRequest) {
 
     // Check if reference email is in client_contacts and if client is claimed
     let isClaimedContact = false
-    const { data: clientContact } = await supabase
+    const { data: clientContact, error: clientContactError } = await supabase
       .from('client_contacts')
       .select('client_id')
-      .eq('email', referenceEmail)
+      .ilike('email', referenceEmail)
       .limit(1)
-      .single()
+      .maybeSingle()
+
+    console.log('Client contact lookup:', { referenceEmail, clientContact, clientContactError })
 
     if (clientContact) {
       const { data: client } = await supabase
@@ -73,6 +75,8 @@ export async function POST(request: NextRequest) {
         .eq('id', clientContact.client_id)
         .single()
       
+      console.log('Client ownership:', { clientId: clientContact.client_id, ownedBy: client?.owned_by })
+      
       if (client?.owned_by) {
         isClaimedContact = true
       }
@@ -80,13 +84,15 @@ export async function POST(request: NextRequest) {
 
     // Check if reference email is in candidates and if claimed
     let isClaimedCandidate = false
-    if (!clientContact) {
-      const { data: candidateRecord } = await supabase
+    if (!isClaimedContact) {
+      const { data: candidateRecord, error: candidateError } = await supabase
         .from('candidates')
         .select('owned_by')
-        .eq('email', referenceEmail)
+        .ilike('email', referenceEmail)
         .limit(1)
-        .single()
+        .maybeSingle()
+
+      console.log('Candidate lookup:', { referenceEmail, candidateRecord, candidateError })
 
       if (candidateRecord?.owned_by) {
         isClaimedCandidate = true
@@ -94,6 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isClaimed = isClaimedContact || isClaimedCandidate
+    console.log('Final isClaimed status:', { isClaimedContact, isClaimedCandidate, isClaimed })
     const recruiterPageUrl = recruiterSlug 
       ? `https://jobs.search.market/r/${recruiterSlug}` 
       : 'https://search.market'
@@ -143,8 +150,11 @@ export async function POST(request: NextRequest) {
     if (!process.env.RESEND_API_KEY) {
       console.log('RESEND_API_KEY not configured, skipping email')
       console.log('Would have sent thank you email to:', referenceEmail)
+      console.log('isClaimed:', isClaimed)
       return NextResponse.json({ success: true, warning: 'Email service not configured' })
     }
+
+    console.log('Sending thank you email to:', referenceEmail, 'isClaimed:', isClaimed)
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -160,13 +170,15 @@ export async function POST(request: NextRequest) {
       })
     })
 
+    const responseData = await response.json()
+    console.log('Resend response:', response.status, responseData)
+
     if (!response.ok) {
-      const errorData = await response.json()
-      console.error('Resend API error:', errorData)
-      return NextResponse.json({ error: 'Failed to send email', details: errorData }, { status: 500 })
+      console.error('Resend API error:', responseData)
+      return NextResponse.json({ error: 'Failed to send email', details: responseData }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, claimed: isClaimed })
+    return NextResponse.json({ success: true, claimed: isClaimed, emailId: responseData.id })
   } catch (error) {
     console.error('Error sending thank you email:', error)
     return NextResponse.json({ error: 'Failed to send email', details: String(error) }, { status: 500 })
