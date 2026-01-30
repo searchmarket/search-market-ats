@@ -110,11 +110,13 @@ export default function PublicReferenceFormPage() {
       
       // Send thank you email
       try {
-        await fetch('/api/reference-thankyou', {
+        const emailResponse = await fetch('/api/reference-thankyou', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
         })
+        const emailResult = await emailResponse.json()
+        console.log('Thank you email API response:', emailResponse.status, emailResult)
       } catch (emailError) {
         console.error('Error sending thank you email:', emailError)
         // Don't block submission if email fails
