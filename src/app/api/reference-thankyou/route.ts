@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: 'Search Market <onboarding@resend.dev>',
+        from: 'Search Market <noreply@search.market>',
         to: referenceEmail,
         subject: subject,
         html: emailHtml
