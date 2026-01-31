@@ -88,7 +88,7 @@ export default function JobsPage() {
   const [rewritingJD, setRewritingJD] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserName, setCurrentUserName] = useState<string>('')
-  const [currentUserAgencyId, setCurrentUserAgencyId] = useState<string | null>(null)
+  const [currentUserAgencyIds, setCurrentUserAgencyIds] = useState<string[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [showCloseJobModal, setShowCloseJobModal] = useState(false)
   const [closeJobStatus, setCloseJobStatus] = useState('filled')
@@ -230,17 +230,15 @@ export default function JobsPage() {
         setCurrentUserName(recruiter.full_name)
       }
       
-      // Check if user is a member of any agency
-      const { data: membership } = await supabase
+      // Check if user is a member of any agencies
+      const { data: memberships } = await supabase
         .from('agency_members')
         .select('agency_id')
         .eq('recruiter_id', user.id)
         .eq('status', 'active')
-        .limit(1)
-        .single()
       
-      if (membership?.agency_id) {
-        setCurrentUserAgencyId(membership.agency_id)
+      if (memberships && memberships.length > 0) {
+        setCurrentUserAgencyIds(memberships.map(m => m.agency_id))
         // Set default tab to agency if user is part of an agency
         setActiveTab('agency')
       }
@@ -437,7 +435,7 @@ export default function JobsPage() {
           ...jobData, 
           recruiter_id: user.id, 
           is_published: false,
-          agency_id: currentUserAgencyId || null
+          agency_id: currentUserAgencyIds.length > 0 ? currentUserAgencyIds[0] : null
         }])
 
       if (error) {
@@ -632,8 +630,8 @@ export default function JobsPage() {
         status: 'open',
         is_published: false,
         recruiter_id: currentUserId,
-        agency_id: currentUserAgencyId || null,
-        visibility: currentUserAgencyId ? 'agency_only' : 'platform'
+        agency_id: currentUserAgencyIds.length > 0 ? currentUserAgencyIds[0] : null,
+        visibility: currentUserAgencyIds.length > 0 ? 'agency_only' : 'platform'
       }])
       .select()
       .single()
@@ -702,7 +700,7 @@ export default function JobsPage() {
       salary_currency: 'CAD',
       fee_percent: '',
       status: 'open',
-      visibility: currentUserAgencyId ? 'agency_only' : 'platform'
+      visibility: currentUserAgencyIds.length > 0 ? 'agency_only' : 'platform'
     })
     setClientContacts([])
     setEditingJob(null)
@@ -721,9 +719,10 @@ export default function JobsPage() {
     if (!currentUserId) return true // Show all while loading
     
     if (activeTab === 'agency') {
-      // Agency Jobs: agency-only jobs from OTHER agency members (not your own)
-      return currentUserAgencyId && 
-             job.agency_id === currentUserAgencyId && 
+      // Agency Jobs: agency-only jobs from OTHER agency members in MY agencies (not your own)
+      return currentUserAgencyIds.length > 0 && 
+             job.agency_id !== null &&
+             currentUserAgencyIds.includes(job.agency_id) && 
              job.visibility === 'agency_only' &&
              job.status === 'open' &&
              job.recruiter_id !== currentUserId
@@ -743,9 +742,10 @@ export default function JobsPage() {
   })
 
   // Counts for tabs
-  const agencyJobsCount = currentUserAgencyId ? jobs.filter(j => 
+  const agencyJobsCount = currentUserAgencyIds.length > 0 ? jobs.filter(j => 
     j.status === 'open' && 
-    j.agency_id === currentUserAgencyId &&
+    j.agency_id !== null &&
+    currentUserAgencyIds.includes(j.agency_id) &&
     j.visibility === 'agency_only' &&
     j.recruiter_id !== currentUserId
   ).length : 0
@@ -1266,7 +1266,7 @@ export default function JobsPage() {
                 </div>
 
                 {/* Visibility - only shown if user is part of an agency */}
-                {currentUserAgencyId && (
+                {currentUserAgencyIds.length > 0 && (
                   <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <label className="block text-sm font-medium text-blue-900 mb-2">Job Visibility</label>
                     <div className="flex gap-4">
@@ -1448,7 +1448,7 @@ export default function JobsPage() {
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-gray-200 mb-6">
         {/* Agency Jobs tab - only shown if user is part of an agency */}
-        {currentUserAgencyId && (
+        {currentUserAgencyIds.length > 0 && (
           <button
             onClick={() => setActiveTab('agency')}
             className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
@@ -1899,7 +1899,7 @@ export default function JobsPage() {
               </div>
 
               {/* Visibility - only shown if user is part of an agency */}
-              {currentUserAgencyId && (
+              {currentUserAgencyIds.length > 0 && (
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <label className="block text-sm font-medium text-blue-900 mb-2">Job Visibility</label>
                   <div className="flex gap-4">
