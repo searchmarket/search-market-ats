@@ -240,7 +240,7 @@ export default function ClientsPage() {
   async function fetchClientAccess(clientId: string) {
     const { data, error } = await supabase
       .from('client_access')
-      .select('id, recruiter_id, recruiter:recruiters(id, full_name, email)')
+      .select('id, recruiter_id, recruiter:recruiters!recruiter_id(id, full_name, email)')
       .eq('client_id', clientId)
 
     if (error) {
@@ -267,7 +267,7 @@ export default function ClientsPage() {
   async function fetchActivityLogs(clientId: string) {
     const { data, error } = await supabase
       .from('client_activity_logs')
-      .select('*, recruiter:recruiters(full_name)')
+      .select('*, recruiter:recruiters!recruiter_id(full_name)')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
 
